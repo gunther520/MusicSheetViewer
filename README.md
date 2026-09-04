@@ -84,11 +84,12 @@ To import and connect this repository:
 1. **One-Click Import**:
    Click the button below to import the repository directly into your Vercel account:
    
-   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgunther520%2FMusicSheetViewer)
+   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgunther520%2FMusicSheetViewer&project-name=music-sheet-viewer)
 
 2. **Or Import via Vercel Dashboard**:
    - Navigate to [vercel.com/new](https://vercel.com/new).
    - Under **"Import Git Repository"**, choose GitHub and select `gunther520/MusicSheetViewer`.
+   - Set **Project Name** to: `music-sheet-viewer` (must be lowercase).
    - Vercel will automatically read `vercel.json` (Vite framework preset, build command `npm run build`, and `dist` output directory).
    - Click **Deploy**.
 
