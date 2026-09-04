@@ -187,6 +187,10 @@ describe('chordUtils', () => {
       expect(isLikelyChordSymbol('ON')).toBe(false);
       expect(isLikelyChordSymbol('AND')).toBe(false);
       expect(isLikelyChordSymbol('TO')).toBe(false);
+      expect(isLikelyChordSymbol('a')).toBe(false);
+      expect(isLikelyChordSymbol('em')).toBe(false);
+      expect(isLikelyChordSymbol('EB')).toBe(false);
+      expect(isLikelyChordSymbol('BB')).toBe(false);
     });
   });
 

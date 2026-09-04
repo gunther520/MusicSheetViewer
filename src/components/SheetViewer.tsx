@@ -164,7 +164,7 @@ export const SheetViewer: React.FC<SheetViewerProps> = ({
       {/* Sheet Instruction Pill */}
       <div className="absolute top-4 left-4 z-20 hidden md:flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-slate-700/80 text-xs text-slate-300 shadow-xl">
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span>Click sheet to add chord • Drag to move • Click chord to edit</span>
+        <span>Click sheet to add • Drag to move • Click chord to edit/delete • Hover <span className="text-rose-400 font-bold">×</span> to quick remove</span>
       </div>
 
       {/* Main Sheet Music Canvas Container */}
@@ -294,8 +294,8 @@ export const SheetViewer: React.FC<SheetViewerProps> = ({
                             e.stopPropagation();
                             onDeleteChord(chord.id);
                           }}
-                          className="p-0.5 text-slate-400 hover:text-rose-400 rounded hover:bg-slate-800"
-                          title="Delete"
+                          className="p-0.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded transition-colors"
+                          title="Quick Remove"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>

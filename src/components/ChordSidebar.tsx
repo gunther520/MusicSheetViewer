@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, Play, Square, ListMusic, Plus, Music2, Eye, EyeOff } from 'lucide-react';
+import { Volume2, Play, Square, ListMusic, Plus, Music2, Eye, EyeOff, Edit3, Trash2 } from 'lucide-react';
 import { ChordPosition, transposeChord, AccidentalPreference } from '../utils/chordUtils';
 import { chordPlayer } from '../utils/audioUtils';
 
@@ -10,6 +10,7 @@ interface ChordSidebarProps {
   activeChordId: string | null;
   onSelectChord: (id: string) => void;
   onAddChordClick: () => void;
+  onDeleteChord: (id: string) => void;
   showOverlayChords: boolean;
   onToggleOverlayChords: () => void;
 }
@@ -21,6 +22,7 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
   activeChordId,
   onSelectChord,
   onAddChordClick,
+  onDeleteChord,
   showOverlayChords,
   onToggleOverlayChords,
 }) => {
@@ -125,9 +127,14 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
       {/* Unique Chords Pill Strip */}
       {uniqueChordsMap.size > 0 && (
         <div className="p-3 border-b border-slate-800/80 bg-slate-900/40">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-            Unique Chords ({uniqueChordsMap.size})
-          </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Unique Chords ({uniqueChordsMap.size})
+            </span>
+            <span className="text-[10px] text-slate-500">
+              Click to hear
+            </span>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {Array.from(uniqueChordsMap.entries()).map(([orig, count]) => {
               const trans = transposeChord(orig, semitones, accidentalPreference);
@@ -209,11 +216,31 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
 
                 <div className="flex items-center gap-1">
                   <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectChord(chord.id);
+                    }}
+                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    title="Edit chord"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                  <button
                     onClick={(e) => handlePlayChord(e, chord.originalText)}
-                    className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-indigo-300 transition-colors"
+                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-indigo-300 transition-colors"
                     title="Play chord audio"
                   >
-                    <Volume2 className="w-3.5 h-3.5" />
+                    <Volume2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteChord(chord.id);
+                    }}
+                    className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                    title="Delete chord"
+                  >
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
               </div>

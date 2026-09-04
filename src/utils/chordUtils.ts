@@ -48,10 +48,23 @@ const FLAT_KEYS = new Set([
   'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm'
 ]);
 
-// Common words in lyrics that look like chords but usually are not in plain lyric contexts
-// Note: We deliberately do NOT exclude 'Am' because A minor is a fundamental chord.
-const EXCLUDED_COMMON_WORDS = new Set([
-  'THE', 'IN', 'ON', 'AT', 'TO', 'BY', 'IT', 'IS', 'AS', 'BE', 'HE', 'ME', 'MY', 'WE', 'SO', 'NO', 'DO', 'GO', 'OR', 'IF', 'UP', 'AND', 'FOR'
+// Words commonly found in lyrics, structure headers, or annotations that must NOT be treated as chords
+export const EXCLUDED_COMMON_WORDS = new Set([
+  // Short common words / pronouns / prepositions
+  'THE', 'IN', 'ON', 'AT', 'TO', 'BY', 'IT', 'IS', 'AS', 'BE', 'HE', 'ME', 'MY', 'WE', 'SO', 'NO', 'DO', 'GO', 'OR', 'IF', 'UP', 'AND', 'FOR',
+  'OF', 'WITH', 'YOU', 'YOUR', 'ALL', 'ARE', 'WAS', 'WERE', 'OUT', 'DAY', 'SEE', 'FACE', 'LORD', 'LIFE', 'KING', 'WILL', 'DONE', 'COME',
+  'DOWN', 'JOY', 'LOVE', 'LIGHT', 'NOT', 'BUT', 'FROM', 'THEY', 'THEM', 'HER', 'HIS', 'OUR', 'WHO', 'WHAT', 'HOW', 'WHEN', 'ONCE', 'BACK',
+  'GIVE', 'SACRIFICE', 'WORSHIP', 'HOLY', 'SPIRIT', 'REIGN', 'PRAISE',
+  // Sheet music section headers and publisher text
+  'INTRO', 'VERSE', 'CHORUS', 'BRIDGE', 'OUTRO', 'ENDING', 'CODA', 'REFRAIN', 'HOOK', 'SOLO', 'INTERLUDE', 'TAG',
+  'COPYRIGHT', 'CCLI', 'BMI', 'STREAM', 'MUSIC', 'PAGE', 'SONG', 'KEY', 'TIME', 'TEMPO',
+  // Double-letter artifact tokens from OCR scanning lyrics
+  'EB', 'BB', 'EE', 'AA', 'CC', 'DD', 'FF', 'GG', 'BA', 'CA', 'DA', 'FA', 'GA'
+]);
+
+// Lowercase tokens that represent words in lyrics rather than chords (e.g. "a", "am", "em", "b", "in")
+export const EXCLUDED_LOWERCASE_WORDS = new Set([
+  'a', 'am', 'an', 'as', 'at', 'be', 'by', 'do', 'em', 'go', 'he', 'if', 'in', 'is', 'it', 'me', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'we'
 ]);
 
 /**
@@ -97,6 +110,12 @@ export function parseChord(chordStr: string): ParsedChord {
 
   if (bass) {
     bass = bass.charAt(0).toUpperCase() + (bass.slice(1).toLowerCase());
+  }
+
+  // Capitalize quality if it was lowercase single letter root that got lumped, or normalize
+  // Check special cases where 'c' was lowercase
+  if (/^[a-g]$/.test(root)) {
+    root = root.toUpperCase();
   }
 
   // Verify root is in note map
@@ -221,11 +240,24 @@ export function getSemitoneDistance(fromKey: string, toKey: string): number {
  * Tests if a recognized word or token is likely a chord symbol in sheet music
  */
 export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): boolean {
-  const cleaned = normalizeAccidentals(token.trim().replace(/^[\[\(\{<|"']+|[\]\)\}>|"':;,]+$/g, ''));
+  const raw = token.trim();
+  const cleaned = normalizeAccidentals(raw.replace(/^[\[\(\{<|"']+|[\]\)\}>|"':;,]+$/g, ''));
   if (!cleaned || cleaned.length > 10) return false;
 
-  // If it's a known non-chord word like "THE", "IN", etc.
-  if (!allowSingleLetterA && EXCLUDED_COMMON_WORDS.has(cleaned.toUpperCase())) {
+  const upper = cleaned.toUpperCase();
+
+  // Filter excluded common words, section headers, lyric terms, and doubled-letter artifacts (like EB, BB)
+  if (EXCLUDED_COMMON_WORDS.has(upper)) {
+    return false;
+  }
+
+  // Filter lowercase words in lyrics (e.g. "a", "am", "em", "b")
+  if (!allowSingleLetterA && EXCLUDED_LOWERCASE_WORDS.has(cleaned)) {
+    return false;
+  }
+
+  // Single letter 'A' or 'I' are English words, usually only valid chords if explicitly allowed
+  if (!allowSingleLetterA && (cleaned === 'A' || cleaned === 'a' || cleaned === 'I' || cleaned === 'i')) {
     return false;
   }
 

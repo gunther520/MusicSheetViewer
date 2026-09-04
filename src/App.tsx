@@ -305,6 +305,7 @@ export const App: React.FC = () => {
                 if (found) setEditingChord(found);
               }}
               onAddChordClick={() => handleAddChordAtPosition(50, 20)}
+              onDeleteChord={handleDeleteChord}
               showOverlayChords={showOverlayChords}
               onToggleOverlayChords={() => setShowOverlayChords(!showOverlayChords)}
             />
