@@ -73,6 +73,28 @@ npm run build
 
 ---
 
+## ☁️ Deployment on Vercel
+
+### One-Click Deploy
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgunther520%2FMusicSheetViewer)
+
+### Deploy via Vercel CLI
+```bash
+# Deploy to preview
+npx vercel
+
+# Deploy to production
+npx vercel --prod
+```
+
+### Deploy via Vercel Dashboard
+1. Go to [vercel.com/new](https://vercel.com/new).
+2. Select your repository `gunther520/MusicSheetViewer`.
+3. Vercel will automatically detect `Vite` preset and `vercel.json`.
+4. Click **Deploy**.
+
+---
+
 ## 🧪 Testing
 
 The codebase includes comprehensive unit and integration tests:
