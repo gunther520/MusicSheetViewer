@@ -1,0 +1,13 @@
+# Agent Rules & Workflow Constraints
+
+## 1. Auto-Merge and Vercel Deployment Rule
+- Every time a Pull Request (PR) is created, immediately enable auto-merge or merge it into the base branch (`main`).
+- Deploy the newest version to Vercel upon PR creation/merge.
+- Push to `main` activates automatic deployment to Vercel via Git integration and GitHub Actions.
+
+## 2. Image Testing Folder Rule (`testing/`)
+- A dedicated testing folder `testing/` is maintained in the root directory for music sheet test images.
+- Users can place any sheet music images (`.jpg`, `.jpeg`, `.png`, `.webp`) in the `testing/` folder.
+- **Every time code changes**, the agent MUST test against all sheet images in `testing/`.
+- **Iteration requirement**: If any sheet image test fails, reiterate and adapt the detection/processing logic until all tests pass.
+- **Strict stopping condition**: Do NOT stop or finish until ALL sheets pass completely with **zero missed chords** and **zero false/spurious chord additions**.

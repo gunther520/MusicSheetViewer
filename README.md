@@ -97,9 +97,29 @@ Once linked, **every commit and push to `main` will automatically build and depl
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Validation Rules
+
+### Mandatory Testing Policy
+1. **Testing Folder (`testing/`)**:
+   - Any sheet music image placed in `testing/` is part of the test suite.
+   - Every time code changes, run full verification across all images in the `testing/` folder:
+     ```bash
+     npm test
+     # or
+     npm run eval:sheets
+     ```
+   - **Stop condition**: Only consider tasks complete when all sheets pass with 100% precision and recall (zero missed chords and zero spurious/false chords added).
+
+2. **Auto-Merge and Vercel Deployment Rule**:
+   - Every time a Pull Request is created or updated, automatically merge the PR into `main` and deploy the newest version to Vercel.
+   - Pushes to `main` trigger continuous production deployment to Vercel.
+
+---
+
+## 🧪 Test Suite Details
 
 The codebase includes comprehensive unit and integration tests:
+- `tests/four-sheets-evaluation.test.ts`: Automated ground-truth evaluation across all sheets in `testing/`.
 - `src/utils/chordUtils.test.ts`: Chord parsing, root/quality/bass extraction, transposition calculations (including 1 key lower, wrapping, accidentals).
 - `src/data/sampleSheets.test.ts`: Sample sheet coordinate validation and progression transposition verification.
 - `src/services/ocrService.test.ts`: OCR token sanitization, symbol filtering, and bounding box normalization.

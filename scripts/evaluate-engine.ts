@@ -180,9 +180,12 @@ export async function detectStaffChords(
   const cropY = Math.max(0, Math.round(yCenter - 30));
   const cropH = 60;
   const cropPath = `/tmp/eval_band_${sheetNum}_${cropIndex}.png`;
-  const imgPath = fs.existsSync(path.join(__dirname, `../tests/fixtures/sheets/${filename}`))
-    ? path.join(__dirname, `../tests/fixtures/sheets/${filename}`)
-    : `/home/ubuntu/.cursor/projects/workspace/assets/${filename}`;
+  const possiblePaths = [
+    path.join(__dirname, `../testing/${filename}`),
+    path.join(__dirname, `../tests/fixtures/sheets/${filename}`),
+    `/home/ubuntu/.cursor/projects/workspace/assets/${filename}`
+  ];
+  const imgPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
   execSync(`ffmpeg -y -i "${imgPath}" -vf "crop=1100:${cropH}:50:${cropY},scale=2200:120" ${cropPath} 2>/dev/null`);
   
   const bandRet = await worker.recognize(cropPath);
