@@ -73,25 +73,26 @@ npm run build
 
 ---
 
-## ☁️ Deployment on Vercel
+## ☁️ Continuous Deployment to Vercel
 
-### One-Click Deploy
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgunther520%2FMusicSheetViewer)
+The repository is configured for automatic deployment: every time code is committed and pushed to `main` on GitHub, Vercel automatically detects the changes and triggers a new production deployment.
 
-### Deploy via Vercel CLI
-```bash
-# Deploy to preview
-npx vercel
+### Connecting Your GitHub Repo to Vercel (One-Time Setup)
 
-# Deploy to production
-npx vercel --prod
-```
+To import and connect this repository:
 
-### Deploy via Vercel Dashboard
-1. Go to [vercel.com/new](https://vercel.com/new).
-2. Select your repository `gunther520/MusicSheetViewer`.
-3. Vercel will automatically detect `Vite` preset and `vercel.json`.
-4. Click **Deploy**.
+1. **One-Click Import**:
+   Click the button below to import the repository directly into your Vercel account:
+   
+   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fgunther520%2FMusicSheetViewer)
+
+2. **Or Import via Vercel Dashboard**:
+   - Navigate to [vercel.com/new](https://vercel.com/new).
+   - Under **"Import Git Repository"**, choose GitHub and select `gunther520/MusicSheetViewer`.
+   - Vercel will automatically read `vercel.json` (Vite framework preset, build command `npm run build`, and `dist` output directory).
+   - Click **Deploy**.
+
+Once linked, **every commit and push to `main` will automatically build and deploy the newest version to your Vercel URL without manual intervention.**
 
 ---
 
