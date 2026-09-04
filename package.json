@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:sheets": "npx tsx scripts/evaluate-engine.ts"
   },
   "dependencies": {
     "lucide-react": "^0.475.0",

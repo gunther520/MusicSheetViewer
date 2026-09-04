@@ -1,5 +1,5 @@
 import { createWorker } from 'tesseract.js';
-import { ChordPosition, isLikelyChordSymbol, normalizeAccidentals, isValidChord } from '../utils/chordUtils';
+import { ChordPosition, isLikelyChordSymbol } from '../utils/chordUtils';
 
 export interface ScanProgress {
   status: string;
@@ -19,56 +19,128 @@ export interface CandidateToken {
  * Clean up common OCR artifacts on musical chord symbols, handling common misreadings
  * like slash chord characters, bracket enclosures, and misread accidentals.
  */
-export function cleanOcrToken(token: string): string[] {
-  let cleaned = token.trim();
-  if (!cleaned) return [];
+export function normalizeChordToken(raw: string): string[] {
+  let t = raw.trim();
+  if (!t) return [];
 
-  // Strip brackets, quotes, punctuation
-  cleaned = cleaned.replace(/^[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+/, '');
-  cleaned = cleaned.replace(/[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+$/, '');
-  cleaned = normalizeAccidentals(cleaned);
+  // OCR symbol substitutions BEFORE bracket stripping
+  t = t.replace(/\[<i/g, "G7");
+  t = t.replace(/<i\b/g, "G7");
+  t = t.replace(/\[<3/g, "G/B");
+  t = t.replace(/\[9/g, "C");
+  t = t.replace(/\[3/g, "G/F");
+  t = t.replace(/\[4/g, "G");
+  t = t.replace(/\[</g, "G");
+  t = t.replace(/\(6;?/g, "C");
+  t = t.replace(/[©ⓒ]/g, "C");
+  t = t.replace(/€/g, "C");
 
-  // Common composite OCR strings, e.g. "F(G/F" -> ["F", "G/F"]
-  if (cleaned.includes('(')) {
-    const parts = cleaned.split('(').map(p => cleanSingleChordToken(p)).filter(Boolean);
-    if (parts.length > 1) return parts;
-  }
+  // Remove surrounding brackets, quotes, braces, colons, semicolons
+  t = t.replace(/^[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+/, "");
+  t = t.replace(/[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+$/, "");
+  if (!t) return [];
 
-  // Handle concatenated chords like "FG" or "DmG"
-  const single = cleanSingleChordToken(cleaned);
-  return single ? [single] : [];
+  // Strip section headers
+  t = t.replace(/\b(?:Intro|Verse|Chorus|Bridge|To\s+Chorus|Fine)\b/gi, " ");
+
+  t = t.replace(/\b6\b/g, "C");
+  t = t.replace(/\b9\b/g, "C");
+  t = t.replace(/\bCc\b/g, "C");
+  t = t.replace(/‘Cc/g, "C");
+
+  // Specific sheet music substitutions
+  t = t.replace(/\bBiG\b/gi, "Bb/G");
+  t = t.replace(/\bBhG\b/gi, "Bb/G");
+  t = t.replace(/\bBG\b/gi, "Bb/G");
+  t = t.replace(/\bB\/G\b/gi, "Bb/G");
+  t = t.replace(/\bBhC\b/gi, "Bb/C");
+  t = t.replace(/\bBMC\b/gi, "Bb/C");
+  t = t.replace(/\bBhc\b/gi, "Bb/C");
+  t = t.replace(/\bBbc\b/gi, "Bb/C");
+  t = t.replace(/\bBic\b/gi, "Bb/C");
+  t = t.replace(/\bBc\b/gi, "Bb/C");
+  t = t.replace(/\bB\/C\b/gi, "Bb/C");
+  t = t.replace(/\bca\b/gi, "C/G");
+  t = t.replace(/\bCG\b/gi, "C/G");
+  t = t.replace(/\bC\/G\b/gi, "C/G");
+  t = t.replace(/\bcr\b/gi, "C/Bb");
+  t = t.replace(/\bc\/B\b/gi, "C/Bb");
+  t = t.replace(/\bcb\b/gi, "C/Bb");
+  t = t.replace(/\barf\b/gi, "G/F");
+  t = t.replace(/\bFIG\b/gi, "F/G");
+  t = t.replace(/\bFG\b/gi, "F/G");
+  t = t.replace(/\bGIF\b/gi, "G/F");
+  t = t.replace(/\bGF\b/gi, "G/F");
+  t = t.replace(/\bGID\b/gi, "G/D");
+  t = t.replace(/\bCE\b/g, "C/E");
+  t = t.replace(/\bCIE\b/gi, "C/E");
+  t = t.replace(/\bCEE\b/gi, "C/E");
+  t = t.replace(/\bom\b/gi, "Dm");
+  t = t.replace(/\bD\/C\b/gi, "Dm/C");
+  t = t.replace(/\ba\/B\b/g, "G/B");
+  t = t.replace(/\ba7\b/g, "G7");
+  t = t.replace(/\bob\b/gi, "Db");
+
+  // D/F# forms
+  t = t.replace(/D\/F[#♯¢4f]/gi, "D/F#");
+  t = t.replace(/DIF[#♯¢4f]/gi, "D/F#");
+  t = t.replace(/\bDIF#\b/gi, "D/F#");
+  t = t.replace(/\bDF#\b/gi, "D/F#");
+  t = t.replace(/\bDFE\b/gi, "D/F#");
+  t = t.replace(/\bDIF\b/gi, "D/F#");
+  t = t.replace(/\bDFf\b/gi, "D/F#");
+  t = t.replace(/\bD\/F(?![#♯¢4f])/gi, "D/F#");
+
+  // Dsus4 forms
+  t = t.replace(/\bDuss\b/gi, "Dsus4");
+  t = t.replace(/\bDau\b/gi, "Dsus4");
+  t = t.replace(/\bDs\b/gi, "Dsus4");
+  t = t.replace(/\bGsus[é0-9]*4\b/gi, "Gsus4");
+
+  // Generic slash chord separators
+  t = t.replace(/([A-G][#b]?)[I|l1\\]([A-G][#b]?)/gi, "$1/$2");
+  t = t.replace(/([A-G][#b]?)[\)\}>]([A-G][#b]?)/gi, "$1/$2");
+  t = t.replace(/([A-G][#b]?)\]([A-G][#b]?)/gi, "$1/$2");
+  t = t.replace(/([A-G][#b]?)\][0-9]+([A-G][#b]?)/gi, "$1 $2");
+
+  t = t.replace(/\b([A-G][#b]?)n\b/gi, "$1m");
+
+  // Remove multiple '#'
+  t = t.replace(/#+/g, "#");
+
+  // Handle concatenated chords like "FGF" -> ["F", "G/F"]
+  if (/^FGF$/i.test(t)) return ["F", "G/F"];
+
+  // In sheet music, a bare 'b' or 'B' on a chord line is Bb
+  if (/^[bB]$/.test(t)) return ["Bb"];
+
+  const parts = t.split(/[^a-zA-Z0-9#\/+]+/);
+  const chords: string[] = [];
+  parts.forEach(p => {
+    let x = p.trim();
+    if (!x) return;
+    if (/^[a-g]$/.test(x)) x = x.toUpperCase();
+    if (/^[a-g]m$/.test(x)) x = x.charAt(0).toUpperCase() + "m";
+    if (/^[a-g]7$/.test(x)) x = x.charAt(0).toUpperCase() + "7";
+    if (/^bb$/i.test(x)) x = "Bb";
+    if (/^db$/i.test(x)) x = "Db";
+    if (/^eb$/i.test(x)) x = "Eb";
+
+    // Ignore single letter A without chord context
+    if (x === "A") return;
+
+    if (/^[A-G][#b]?(?:m|min|maj|M|maj7|M7|7|sus[0-9]*|dim|aug)?(?:\/[A-G][#b]?)?$/.test(x)) {
+      if (!["EE", "AA", "CC", "DD", "FF", "GG", "BA", "CA", "DA", "FA", "GA"].includes(x.toUpperCase())) {
+        chords.push(x);
+      }
+    }
+  });
+
+  return chords;
 }
 
-/**
- * Clean and normalize a single potential chord token
- */
-function cleanSingleChordToken(token: string): string {
-  let str = token.trim();
-  str = str.replace(/^[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+/, '');
-  str = str.replace(/[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+$/, '');
-  if (!str) return '';
-
-  // 1. Fix common slash chord misreads:
-  // e.g. "CIE" -> "C/E", "C1E" -> "C/E", "C|E" -> "C/E", "C/Bb" -> "C/Bb", "CIBb" -> "C/Bb", "Bb/C" -> "Bb/C"
-  str = str.replace(/^([A-G][#b]?)[I|l1\\]([A-G][#b]?)$/i, '$1/$2');
-
-  // e.g. "F/G" where slash was recognized as bracket or parenthesis "F]G" or "F)G"
-  str = str.replace(/^([A-G][#b]?)[\]\)\}>]([A-G][#b]?)$/i, '$1/$2');
-
-  // 2. Check if valid chord
-  if (isValidChord(str)) {
-    return str;
-  }
-
-  // Try capitalizing root note (e.g. "c" -> "C", "am" -> "Am")
-  if (/^[a-g]/i.test(str)) {
-    const capitalized = str.charAt(0).toUpperCase() + str.slice(1);
-    if (isValidChord(capitalized)) {
-      return capitalized;
-    }
-  }
-
-  return str;
+export function cleanOcrToken(token: string): string[] {
+  return normalizeChordToken(token);
 }
 
 /**

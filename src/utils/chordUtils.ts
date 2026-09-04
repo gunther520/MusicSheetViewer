@@ -59,7 +59,8 @@ export const EXCLUDED_COMMON_WORDS = new Set([
   'INTRO', 'VERSE', 'CHORUS', 'BRIDGE', 'OUTRO', 'ENDING', 'CODA', 'REFRAIN', 'HOOK', 'SOLO', 'INTERLUDE', 'TAG',
   'COPYRIGHT', 'CCLI', 'BMI', 'STREAM', 'MUSIC', 'PAGE', 'SONG', 'KEY', 'TIME', 'TEMPO',
   // OCR artifacts / syllables frequently misread from sheet music notes & lyrics
-  'EB', 'BB', 'EE', 'AA', 'CC', 'DD', 'FF', 'GG', 'BA', 'CA', 'DA', 'FA', 'GA',
+  // Note: 'BB' and 'EB' are checked separately so real chords 'Bb' and 'Eb' are not blocked
+  'EE', 'AA', 'CC', 'DD', 'FF', 'GG', 'BA', 'CA', 'DA', 'FA', 'GA',
   'I'
 ]);
 
@@ -247,19 +248,23 @@ export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): 
 
   const upper = cleaned.toUpperCase();
 
-  // Filter excluded common words, section headers, lyric terms, and doubled-letter artifacts (like EB, BB)
+  // Exact uppercase double-letter artifacts (like EB, BB) are not chords, but real chords Bb and Eb are valid
+  if (cleaned === 'EB' || cleaned === 'BB') {
+    return false;
+  }
+
+  // Filter excluded common words, section headers, lyric terms, and doubled-letter artifacts
   if (EXCLUDED_COMMON_WORDS.has(upper)) {
+    return false;
+  }
+
+  // Handle single-letter 'A' or 'B'
+  if (!allowSingleLetterA && (cleaned === 'A' || cleaned === 'a' || cleaned === 'I' || cleaned === 'i' || cleaned === 'B')) {
     return false;
   }
 
   // Filter lowercase words in lyrics (e.g. "a", "am", "em", "b")
   if (!allowSingleLetterA && EXCLUDED_LOWERCASE_WORDS.has(cleaned)) {
-    return false;
-  }
-
-  // Single letter 'A' or 'B' or 'I' as bare single letters in sheet music:
-  // 'A' and 'I' are English words; bare 'B' without chord context or sharp/flat is often a misread flat or note head
-  if (!allowSingleLetterA && (cleaned === 'A' || cleaned === 'a' || cleaned === 'I' || cleaned === 'i')) {
     return false;
   }
 
