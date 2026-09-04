@@ -150,7 +150,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onSheetSelected }) => 
           </div>
 
           <p className="text-xs text-slate-500 mt-4">
-            Supports JPG, PNG, WEBP, screenshots & scanned sheet photos
+            Supports JPG, PNG, WEBP, screenshots & scanned sheet photos • Enhanced with Multimodal Vision AI & Local OCR
           </p>
         </div>
       </div>

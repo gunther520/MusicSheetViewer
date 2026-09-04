@@ -1,5 +1,7 @@
 import { createWorker } from 'tesseract.js';
-import { ChordPosition, isLikelyChordSymbol } from '../utils/chordUtils';
+import { ChordPosition, isLikelyChordSymbol, isValidChord } from '../utils/chordUtils';
+export type { ChordPosition };
+export { isValidChord };
 
 export interface ScanProgress {
   status: string;
@@ -397,6 +399,42 @@ export async function scanSheetForChords(
     }
     throw error;
   }
+}
+
+/**
+ * High-accuracy chord scanner that attempts Vision AI detection first
+ * when available, and automatically falls back to local OCR.
+ */
+export async function scanSheetWithFallback(
+  imageSource: string | HTMLImageElement,
+  visionOptions?: {
+    apiKey?: string;
+    provider?: 'openai' | 'gemini' | 'anthropic';
+    apiEndpoint?: string;
+  },
+  onProgress?: (progress: ScanProgress) => void
+): Promise<ChordPosition[]> {
+  const imageUrl = typeof imageSource === 'string'
+    ? imageSource
+    : (imageSource as HTMLImageElement).src;
+
+  // 1. Try Vision AI if configured
+  if (visionOptions?.apiKey || visionOptions?.apiEndpoint) {
+    try {
+      onProgress?.({ status: 'Scanning with Vision AI...', progress: 0.2 });
+      const { scanSheetWithVisionAI } = await import('./visionAiService');
+      const visionChords = await scanSheetWithVisionAI(imageUrl, visionOptions);
+      if (visionChords && visionChords.length > 0) {
+        onProgress?.({ status: 'Vision AI scan completed!', progress: 1 });
+        return visionChords;
+      }
+    } catch (visionErr) {
+      console.warn('Vision AI scan failed or unavailable, falling back to local OCR:', visionErr);
+    }
+  }
+
+  // 2. Fallback to local OCR
+  return scanSheetForChords(imageSource, onProgress);
 }
 
 function loadImage(source: string | HTMLImageElement): Promise<HTMLImageElement> {

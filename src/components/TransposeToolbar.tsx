@@ -26,6 +26,10 @@ interface TransposeToolbarProps {
   onPrint: () => void;
   onResetChords: () => void;
   onChangeSheet: () => void;
+  visionApiKey?: string;
+  onVisionApiKeyChange?: (key: string) => void;
+  visionProvider?: 'openai' | 'gemini';
+  onVisionProviderChange?: (provider: 'openai' | 'gemini') => void;
 }
 
 export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
@@ -44,6 +48,10 @@ export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
   onPrint,
   onResetChords,
   onChangeSheet,
+  visionApiKey = '',
+  onVisionApiKeyChange,
+  visionProvider = 'openai',
+  onVisionProviderChange,
 }) => {
   const [fromKey, setFromKey] = React.useState<string>('C');
   const [toKey, setToKey] = React.useState<string>('Bb');
@@ -345,6 +353,36 @@ export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
               >
                 Clear/Reset
               </button>
+            </div>
+
+            {/* Vision AI Configuration */}
+            <div className="bg-slate-950/40 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-1.5 sm:col-span-2 lg:col-span-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  Multimodal Vision AI Chord Scanner (Optional)
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {visionApiKey ? 'Vision AI mode active' : 'Uses built-in high-precision OCR when no key is set'}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={visionProvider}
+                  onChange={(e) => onVisionProviderChange?.(e.target.value as 'openai' | 'gemini')}
+                  className="bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 text-xs font-medium"
+                >
+                  <option value="openai">OpenAI (GPT-4o-mini)</option>
+                  <option value="gemini">Google (Gemini 1.5 Flash)</option>
+                </select>
+                <input
+                  type="password"
+                  placeholder="Enter API key (e.g. sk-...) for Vision AI scan"
+                  value={visionApiKey}
+                  onChange={(e) => onVisionApiKeyChange?.(e.target.value)}
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
             </div>
           </div>
         )}

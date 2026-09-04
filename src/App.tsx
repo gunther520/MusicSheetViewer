@@ -6,7 +6,7 @@ import { TransposeToolbar } from './components/TransposeToolbar';
 import { ChordSidebar } from './components/ChordSidebar';
 import { ChordEditorModal } from './components/ChordEditorModal';
 import { ChordPosition, AccidentalPreference } from './utils/chordUtils';
-import { scanSheetForChords } from './services/ocrService';
+import { scanSheetWithFallback } from './services/ocrService';
 import { downloadTransposedSheet, printTransposedSheet } from './utils/exportUtils';
 import { SAMPLE_SHEETS } from './data/sampleSheets';
 
@@ -37,6 +37,10 @@ export const App: React.FC = () => {
   const [scanProgress, setScanProgress] = useState<number>(0);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Vision AI Settings state (stored in localStorage)
+  const [visionApiKey, setVisionApiKey] = useState<string>(() => localStorage.getItem('vision_api_key') || '');
+  const [visionProvider, setVisionProvider] = useState<'openai' | 'gemini'>('openai');
+
   const showNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => {
@@ -64,18 +68,26 @@ export const App: React.FC = () => {
     }
   };
 
-  // OCR Scanner
+  // OCR / Vision Scanner
   const handleScanOcr = async () => {
     if (!sheetImage || isScanning) return;
     setIsScanning(true);
     setScanProgress(0);
-    setScanStatus('Initializing OCR engine...');
+    setScanStatus(visionApiKey ? 'Starting Vision AI chord scan...' : 'Initializing OCR engine...');
 
     try {
-      const detected = await scanSheetForChords(sheetImage, (p) => {
-        setScanStatus(p.status);
-        setScanProgress(p.progress);
-      });
+      const detected = await scanSheetWithFallback(
+        sheetImage,
+        {
+          apiKey: visionApiKey || undefined,
+          provider: visionProvider,
+          apiEndpoint: '/api/detect-chords',
+        },
+        (p) => {
+          setScanStatus(p.status);
+          setScanProgress(p.progress);
+        }
+      );
 
       if (detected.length > 0) {
         setChords(detected);
@@ -85,7 +97,7 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       console.error('Scan error:', err);
-      showNotification('OCR scan encountered an issue. You can click on the sheet to manually add chords.');
+      showNotification('Scan encountered an issue. You can click on the sheet to manually add chords.');
     } finally {
       setIsScanning(false);
     }
@@ -268,6 +280,13 @@ export const App: React.FC = () => {
             onPrint={handlePrint}
             onResetChords={handleResetChords}
             onChangeSheet={() => setSheetImage(null)}
+            visionApiKey={visionApiKey}
+            onVisionApiKeyChange={(key) => {
+              setVisionApiKey(key);
+              localStorage.setItem('vision_api_key', key);
+            }}
+            visionProvider={visionProvider}
+            onVisionProviderChange={setVisionProvider}
           />
 
           {/* Viewer & Sidebar Workspace */}

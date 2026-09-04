@@ -120,6 +120,7 @@ Once linked, **every commit and push to `main` will automatically build and depl
 
 The codebase includes comprehensive unit and integration tests:
 - `tests/four-sheets-evaluation.test.ts`: Automated ground-truth evaluation across all sheets in `testing/`.
+- `src/services/visionAiService.test.ts`: Multimodal Vision AI JSON parsing, validation, and schema tests.
 - `src/utils/chordUtils.test.ts`: Chord parsing, root/quality/bass extraction, transposition calculations (including 1 key lower, wrapping, accidentals).
 - `src/data/sampleSheets.test.ts`: Sample sheet coordinate validation and progression transposition verification.
 - `src/services/ocrService.test.ts`: OCR token sanitization, symbol filtering, and bounding box normalization.
