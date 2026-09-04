@@ -44,7 +44,7 @@ export const ChordEditorModal: React.FC<ChordEditorModalProps> = ({
     }
   };
 
-  const commonChords = ['C', 'G', 'Am', 'F', 'D', 'Em', 'A', 'E', 'Dm', 'Bb', 'Bm', 'F#m'];
+  const commonChords = ['C', 'C/E', 'G', 'G/F', 'Am', 'F', 'D', 'Em', 'Dm', 'C7', 'Bb', 'Bb/C', 'Gsus4', 'F/G'];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

@@ -28,7 +28,7 @@ export function cleanOcrToken(token: string): string[] {
   cleaned = cleaned.replace(/[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+$/, '');
   cleaned = normalizeAccidentals(cleaned);
 
-  // Common composite OCR strings, e.g. "F(G/F" -> ["F", "G/F"] or "F/G/F" -> ["F", "G/F"]
+  // Common composite OCR strings, e.g. "F(G/F" -> ["F", "G/F"]
   if (cleaned.includes('(')) {
     const parts = cleaned.split('(').map(p => cleanSingleChordToken(p)).filter(Boolean);
     if (parts.length > 1) return parts;
@@ -49,22 +49,18 @@ function cleanSingleChordToken(token: string): string {
   if (!str) return '';
 
   // 1. Fix common slash chord misreads:
-  // e.g. "CIE" -> "C/E", "C1E" -> "C/E", "C|E" -> "C/E", "C/Bb" -> "C/Bb", "CIBb" -> "C/Bb"
+  // e.g. "CIE" -> "C/E", "C1E" -> "C/E", "C|E" -> "C/E", "C/Bb" -> "C/Bb", "CIBb" -> "C/Bb", "Bb/C" -> "Bb/C"
   str = str.replace(/^([A-G][#b]?)[I|l1\\]([A-G][#b]?)$/i, '$1/$2');
 
   // e.g. "F/G" where slash was recognized as bracket or parenthesis "F]G" or "F)G"
   str = str.replace(/^([A-G][#b]?)[\]\)\}>]([A-G][#b]?)$/i, '$1/$2');
 
-  // e.g. "F(G/F" -> handled by split earlier
-
-  // 2. Fix flat symbol misread as lowercase 'b' or uppercase 'B' on root notes
-  // e.g. "Bb" vs "BB" (if someone wrote Bb and OCR read BB)
-  // But check if it's already a valid chord
+  // 2. Check if valid chord
   if (isValidChord(str)) {
     return str;
   }
 
-  // Try capitalizing root note
+  // Try capitalizing root note (e.g. "c" -> "C", "am" -> "Am")
   if (/^[a-g]/i.test(str)) {
     const capitalized = str.charAt(0).toUpperCase() + str.slice(1);
     if (isValidChord(capitalized)) {
@@ -76,10 +72,69 @@ function cleanSingleChordToken(token: string): string {
 }
 
 /**
+ * Music Sheet Staff Heuristic:
+ * Given detected line Y positions or image height, snaps chord candidate Y position
+ * to the closest staff chord track baseline if within tolerance.
+ */
+export function snapToNearestStaffChordTrack(
+  y: number,
+  staffChordTracks: number[],
+  maxDistance = 45
+): number {
+  if (staffChordTracks.length === 0) return y;
+
+  let closestTrack = y;
+  let minDiff = Infinity;
+
+  staffChordTracks.forEach((trackY) => {
+    const diff = Math.abs(y - trackY);
+    if (diff < minDiff && diff <= maxDistance) {
+      minDiff = diff;
+      closestTrack = trackY;
+    }
+  });
+
+  return closestTrack;
+}
+
+/**
+ * Detects horizontal staff bands and chord track baselines using horizontal projection
+ * on sheet music.
+ */
+export function detectStaffBands(imgHeight: number, sampleYCoords: number[]): number[] {
+  if (sampleYCoords.length === 0) return [];
+
+  // Cluster Y coordinates into distinct staff chord rows
+  const yTolerance = imgHeight * 0.04;
+  const clusters: number[][] = [];
+
+  sampleYCoords.forEach((y) => {
+    let placed = false;
+    for (const cluster of clusters) {
+      const avgY = cluster.reduce((sum, val) => sum + val, 0) / cluster.length;
+      if (Math.abs(y - avgY) <= yTolerance) {
+        cluster.push(y);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      clusters.push([y]);
+    }
+  });
+
+  // Calculate average Y for clusters that have at least 2 chords or high significance
+  return clusters
+    .map((c) => c.reduce((sum, val) => sum + val, 0) / c.length)
+    .sort((a, b) => a - b);
+}
+
+/**
  * Post-processes recognized chords:
  * 1. Clusters chords into horizontal staff reading lines (chords on the same staff share similar Y coords)
  * 2. Filters out stray lyric syllables and low-confidence isolated tokens far below staves
- * 3. Removes duplicates and overlapping boxes
+ * 3. Snaps chords on each staff line to a uniform vertical baseline so overlays align neatly
+ * 4. Removes duplicates and overlapping boxes
  */
 export function filterAndClusterChords(
   tokens: CandidateToken[],
@@ -98,7 +153,7 @@ export function filterAndClusterChords(
       if (t.confidence < 25) return;
 
       // Exclude tokens in extreme header / footer areas
-      // Top 5% (page counter, title) or bottom 5% (copyright, publisher)
+      // Top 6% (page counter, title) or bottom 6% (copyright, publisher)
       const yPercent = (t.y0 / imgHeight) * 100;
       if (yPercent < 6 || yPercent > 94) return;
 
@@ -120,7 +175,7 @@ export function filterAndClusterChords(
 
   if (validTokens.length === 0) return [];
 
-  // Group tokens by Y coordinate into horizontal chord lines (tolerance: within ~3.5% of sheet height)
+  // Group tokens by Y coordinate into horizontal chord lines (tolerance: within ~3.8% of sheet height)
   const yTolerance = imgHeight * 0.038;
   const lines: CandidateToken[][] = [];
 
@@ -145,8 +200,8 @@ export function filterAndClusterChords(
     }
   });
 
-  // Filter lines: On music lead sheets, authentic chord rows typically have multiple chords,
-  // whereas stray lyrics or random noise appear as isolated single low-confidence lowercase/single-character items
+  // Filter and snap lines:
+  // On sheet music, chords above a staff share an identical horizontal baseline!
   const filteredTokens: CandidateToken[] = [];
 
   lines.forEach((line) => {
@@ -159,20 +214,30 @@ export function filterAndClusterChords(
       }
     }
 
+    // Calculate common baseline Y for this entire staff chord line
+    const staffLineY = line.reduce((sum, t) => sum + t.y0, 0) / line.length;
+
     // Sort tokens within line left-to-right
     line.sort((a, b) => a.x0 - b.x0);
 
     // Deduplicate tokens that are almost at the same X position within the same row
     const deduplicated: CandidateToken[] = [];
     line.forEach((tok) => {
+      // Snap Y coordinate to the common staff line baseline for crisp alignment
+      const alignedTok: CandidateToken = {
+        ...tok,
+        y0: staffLineY,
+        y1: staffLineY + (tok.y1 - tok.y0),
+      };
+
       const prev = deduplicated[deduplicated.length - 1];
-      if (prev && Math.abs(tok.x0 - prev.x0) < imgWidth * 0.03) {
+      if (prev && Math.abs(alignedTok.x0 - prev.x0) < imgWidth * 0.03) {
         // Keep the one with higher confidence or longer chord name
-        if (tok.confidence > prev.confidence || tok.text.length > prev.text.length) {
-          deduplicated[deduplicated.length - 1] = tok;
+        if (alignedTok.confidence > prev.confidence || alignedTok.text.length > prev.text.length) {
+          deduplicated[deduplicated.length - 1] = alignedTok;
         }
       } else {
-        deduplicated.push(tok);
+        deduplicated.push(alignedTok);
       }
     });
 
@@ -231,7 +296,7 @@ export async function scanSheetForChords(
     const ret = await worker.recognize(img);
     await worker.terminate();
 
-    onProgress?.({ status: 'Filtering & aligning chord positions...', progress: 0.95 });
+    onProgress?.({ status: 'Filtering & aligning chord positions along staves...', progress: 0.95 });
 
     const candidateTokens: CandidateToken[] = [];
     if (ret.data && ret.data.words) {

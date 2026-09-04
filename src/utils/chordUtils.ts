@@ -58,8 +58,9 @@ export const EXCLUDED_COMMON_WORDS = new Set([
   // Sheet music section headers and publisher text
   'INTRO', 'VERSE', 'CHORUS', 'BRIDGE', 'OUTRO', 'ENDING', 'CODA', 'REFRAIN', 'HOOK', 'SOLO', 'INTERLUDE', 'TAG',
   'COPYRIGHT', 'CCLI', 'BMI', 'STREAM', 'MUSIC', 'PAGE', 'SONG', 'KEY', 'TIME', 'TEMPO',
-  // Double-letter artifact tokens from OCR scanning lyrics
-  'EB', 'BB', 'EE', 'AA', 'CC', 'DD', 'FF', 'GG', 'BA', 'CA', 'DA', 'FA', 'GA'
+  // OCR artifacts / syllables frequently misread from sheet music notes & lyrics
+  'EB', 'BB', 'EE', 'AA', 'CC', 'DD', 'FF', 'GG', 'BA', 'CA', 'DA', 'FA', 'GA',
+  'I'
 ]);
 
 // Lowercase tokens that represent words in lyrics rather than chords (e.g. "a", "am", "em", "b", "in")
@@ -256,7 +257,8 @@ export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): 
     return false;
   }
 
-  // Single letter 'A' or 'I' are English words, usually only valid chords if explicitly allowed
+  // Single letter 'A' or 'B' or 'I' as bare single letters in sheet music:
+  // 'A' and 'I' are English words; bare 'B' without chord context or sharp/flat is often a misread flat or note head
   if (!allowSingleLetterA && (cleaned === 'A' || cleaned === 'a' || cleaned === 'I' || cleaned === 'i')) {
     return false;
   }
