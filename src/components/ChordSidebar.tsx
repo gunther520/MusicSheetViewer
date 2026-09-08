@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, Play, Square, ListMusic, Plus, Music2, Eye, EyeOff, Edit3, Trash2 } from 'lucide-react';
+import { Volume2, Play, Square, ListMusic, Plus, Music2, Eye, EyeOff, Edit3, Trash2, FileText } from 'lucide-react';
 import { ChordPosition, transposeChord, AccidentalPreference } from '../utils/chordUtils';
 import { chordPlayer } from '../utils/audioUtils';
 
@@ -14,6 +14,7 @@ interface ChordSidebarProps {
   onDeleteChord: (id: string) => void;
   showOverlayChords: boolean;
   onToggleOverlayChords: () => void;
+  onImportChordsClick?: () => void;
 }
 
 export const ChordSidebar: React.FC<ChordSidebarProps> = ({
@@ -27,6 +28,7 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
   onDeleteChord,
   showOverlayChords,
   onToggleOverlayChords,
+  onImportChordsClick,
 }) => {
   const [isPlayingProgression, setIsPlayingProgression] = useState(false);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
@@ -82,6 +84,16 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          {onImportChordsClick && (
+            <button
+              onClick={onImportChordsClick}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1"
+              title="Import chord progression text"
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             onClick={onToggleOverlayChords}
             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1"

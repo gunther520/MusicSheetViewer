@@ -5,6 +5,7 @@ import { SheetViewer } from './components/SheetViewer';
 import { TransposeToolbar } from './components/TransposeToolbar';
 import { ChordSidebar } from './components/ChordSidebar';
 import { ChordEditorModal } from './components/ChordEditorModal';
+import { ChordImportModal } from './components/ChordImportModal';
 import { ChordPosition, AccidentalPreference } from './utils/chordUtils';
 import { scanSheetWithFallback } from './services/ocrService';
 import { downloadTransposedSheet, printTransposedSheet } from './utils/exportUtils';
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
   const [activeChordId, setActiveChordId] = useState<string | null>(null);
   const [editingChord, setEditingChord] = useState<ChordPosition | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
 
   // OCR scanning state
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -292,6 +294,7 @@ export const App: React.FC = () => {
             }}
             visionProvider={visionProvider}
             onVisionProviderChange={setVisionProvider}
+            onImportChordsClick={() => setIsImportOpen(true)}
           />
 
           {/* Viewer & Sidebar Workspace */}
@@ -333,6 +336,7 @@ export const App: React.FC = () => {
               onDeleteChord={handleDeleteChord}
               showOverlayChords={showOverlayChords}
               onToggleOverlayChords={() => setShowOverlayChords(!showOverlayChords)}
+              onImportChordsClick={() => setIsImportOpen(true)}
             />
           </div>
         </div>
@@ -350,6 +354,16 @@ export const App: React.FC = () => {
         }}
         onSave={handleSaveChord}
         onDelete={handleDeleteChord}
+      />
+
+      {/* Quick Chord Progression Import Modal */}
+      <ChordImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImport={(importedChords) => {
+          setChords((prev) => [...prev, ...importedChords]);
+          showNotification(`Added ${importedChords.length} chords across your sheet! Drag or click to adjust.`);
+        }}
       />
     </div>
   );

@@ -26,7 +26,9 @@ An interactive sheet music application that allows musicians to photograph or up
 - **Multiple Display Modes**: Transposed badge, Dual mode (e.g. `C → B♭`), or transparent outline.
 - **Click-to-Add**: Tap anywhere on the sheet music to place a chord at that exact position.
 - **Drag-to-Move**: Freely reposition chord overlays on the sheet.
+- **Quick Progression Import**: Paste any chord progression (e.g. `C G Am F`) to automatically distribute and place chords across staves in seconds.
 - **Chord Editor Modal**: Click any chord to edit text, test audio, or delete.
+- **Keyboard Shortcuts**: Select any chord badge and hit <kbd>Delete</kbd> or <kbd>Backspace</kbd> to delete it instantly.
 - **Zoom & Pan**: Smooth zoom controls (50% to 250%) and reset view.
 
 ### 4. Audio Playback & Verification

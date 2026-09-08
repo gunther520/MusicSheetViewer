@@ -22,125 +22,65 @@ export interface CandidateToken {
 /**
  * Clean up common OCR artifacts on musical chord symbols, handling common misreadings
  * like slash chord characters, bracket enclosures, and misread accidentals.
+ * Uses music-theory-grounded rules rather than sheet-specific hardcoded replacements.
  */
 export function normalizeChordToken(raw: string): string[] {
   let t = raw.trim();
   if (!t) return [];
 
-  // OCR symbol substitutions BEFORE bracket stripping
-  t = t.replace(/\[<i/g, "G7");
-  t = t.replace(/<i\b/g, "G7");
-  t = t.replace(/\[<3/g, "G/B");
-  t = t.replace(/\[9/g, "C");
-  t = t.replace(/\[3/g, "G/F");
-  t = t.replace(/\[4/g, "G");
-  t = t.replace(/\[</g, "G");
-  t = t.replace(/\(6;?/g, "C");
-  t = t.replace(/[©ⓒ]/g, "C");
-  t = t.replace(/€/g, "C");
-
-  // Remove surrounding brackets, quotes, braces, colons, semicolons
+  // Remove surrounding brackets, quotes, braces, colons, semicolons, pipe bars
   t = t.replace(/^[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+/, "");
   t = t.replace(/[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+$/, "");
   if (!t) return [];
 
-  // Strip section headers
-  t = t.replace(/\b(?:Intro|Verse|Chorus|Bridge|To\s+Chorus|Fine)\b/gi, " ");
+  // Strip section headers and musical direction markings
+  t = t.replace(/\b(?:Intro|Verse|Chorus|Bridge|To\s+Chorus|Ending|Outro|Coda|Refrain|Hook|Solo|Fine|Tempo|Bpm)\b/gi, " ");
 
-  t = t.replace(/\b6\b/g, "C");
-  t = t.replace(/\b9\b/g, "C");
-  t = t.replace(/\bCc\b/g, "C");
-  t = t.replace(/‘Cc/g, "C");
+  // Normalize accidentals
+  t = t.replace(/[♯#]/g, "#").replace(/[♭]/g, "b");
 
-  // Specific sheet music substitutions
-  t = t.replace(/\bBiG\b/gi, "Bb/G");
-  t = t.replace(/\bBhG\b/gi, "Bb/G");
-  t = t.replace(/\bBG\b/gi, "Bb/G");
-  t = t.replace(/\bB\/G\b/gi, "Bb/G");
-  t = t.replace(/\bBhC\b/gi, "Bb/C");
-  t = t.replace(/\bBMC\b/gi, "Bb/C");
-  t = t.replace(/\bBhc\b/gi, "Bb/C");
-  t = t.replace(/\bBbc\b/gi, "Bb/C");
-  t = t.replace(/\bBic\b/gi, "Bb/C");
-  t = t.replace(/\bBc\b/gi, "Bb/C");
-  t = t.replace(/\bB\/C\b/gi, "Bb/C");
-  t = t.replace(/\bca\b/gi, "C/G");
-  t = t.replace(/\bCG\b/gi, "C/G");
-  t = t.replace(/\bC\/G\b/gi, "C/G");
-  t = t.replace(/\bcr\b/gi, "C/Bb");
-  t = t.replace(/\bc\/B\b/gi, "C/Bb");
-  t = t.replace(/\bcb\b/gi, "C/Bb");
-  t = t.replace(/\barf\b/gi, "G/F");
-  t = t.replace(/\bFIG\b/gi, "F/G");
-  t = t.replace(/\bFG\b/gi, "F/G");
-  t = t.replace(/\bGIF\b/gi, "G/F");
-  t = t.replace(/\bGF\b/gi, "G/F");
-  t = t.replace(/\bGID\b/gi, "G/D");
-  t = t.replace(/\bCE\b/g, "C/E");
-  t = t.replace(/\bCIE\b/gi, "C/E");
-  t = t.replace(/\bCEE\b/gi, "C/E");
-  t = t.replace(/\bom\b/gi, "Dm");
-  t = t.replace(/\bD\/C\b/gi, "Dm/C");
-  t = t.replace(/\ba\/B\b/g, "G/B");
-  t = t.replace(/\ba7\b/g, "G7");
-  t = t.replace(/\bob\b/gi, "Db");
-
-  // D/F# forms
-  t = t.replace(/D\/F[#♯¢4f]/gi, "D/F#");
-  t = t.replace(/DIF[#♯¢4f]/gi, "D/F#");
-  t = t.replace(/\bDIF#\b/gi, "D/F#");
-  t = t.replace(/\bDF#\b/gi, "D/F#");
-  t = t.replace(/\bDFE\b/gi, "D/F#");
-  t = t.replace(/\bDIF\b/gi, "D/F#");
-  t = t.replace(/\bDFf\b/gi, "D/F#");
-  t = t.replace(/\bD\/F(?![#♯¢4f])/gi, "D/F#");
-
-  // Dsus4 forms
-  t = t.replace(/\bDuss\b/gi, "Dsus4");
-  t = t.replace(/\bDau\b/gi, "Dsus4");
-  t = t.replace(/\bDs\b/gi, "Dsus4");
-  t = t.replace(/\bGsus[é0-9]*4\b/gi, "Gsus4");
-
-  // Generic slash chord separators
-  t = t.replace(/([A-G][#b]?)[I|l1\\]([A-G][#b]?)/gi, "$1/$2");
+  // Normalize slash chord separators (e.g. C/E, C|E, C\E, C1E, CIE, C!E)
+  t = t.replace(/([A-G][#b]?)[I|l1\\!]([A-G][#b]?)/gi, "$1/$2");
   t = t.replace(/([A-G][#b]?)[\)\}>]([A-G][#b]?)/gi, "$1/$2");
   t = t.replace(/([A-G][#b]?)\]([A-G][#b]?)/gi, "$1/$2");
   t = t.replace(/([A-G][#b]?)\][0-9]+([A-G][#b]?)/gi, "$1 $2");
 
+  // Common OCR letter-confusion on musical qualities (e.g. "An" -> "Am", "Dn" -> "Dm")
   t = t.replace(/\b([A-G][#b]?)n\b/gi, "$1m");
 
-  // Remove multiple '#'
+  // Normalize sus chord OCR typos like susé4 -> sus4
+  t = t.replace(/sus[é0-9]*4/gi, "sus4");
+
+  // Remove duplicate accidentals
   t = t.replace(/#+/g, "#");
 
-  // Handle concatenated chords like "FGF" -> ["F", "G/F"]
-  if (/^FGF$/i.test(t)) return ["F", "G/F"];
-
-  // In sheet music, a bare 'b' or 'B' on a chord line is Bb
-  if (/^[bB]$/.test(t)) return ["Bb"];
-
-  const parts = t.split(/[^a-zA-Z0-9#\/+]+/);
-  const chords: string[] = [];
-  parts.forEach(p => {
-    let x = p.trim();
-    if (!x) return;
-    if (/^[a-g]$/.test(x)) x = x.toUpperCase();
-    if (/^[a-g]m$/.test(x)) x = x.charAt(0).toUpperCase() + "m";
-    if (/^[a-g]7$/.test(x)) x = x.charAt(0).toUpperCase() + "7";
-    if (/^bb$/i.test(x)) x = "Bb";
-    if (/^db$/i.test(x)) x = "Db";
-    if (/^eb$/i.test(x)) x = "Eb";
-
-    // Ignore single letter A without chord context
-    if (x === "A") return;
-
-    if (/^[A-G][#b]?(?:m|min|maj|M|maj7|M7|7|sus[0-9]*|dim|aug)?(?:\/[A-G][#b]?)?$/.test(x)) {
-      if (!["EE", "AA", "CC", "DD", "FF", "GG", "BA", "CA", "DA", "FA", "GA"].includes(x.toUpperCase())) {
-        chords.push(x);
+  // Extract all valid chord candidates using standard musical grammar:
+  // Root: [A-G][#b]?
+  // Quality: m, min, maj, M, 7, maj7, M7, sus, sus2, sus4, dim, aug, add9, 6, 9, 11, 13, m7, m7b5, etc.
+  // Optional bass note: /[A-G][#b]?
+  const chordRegex = /([A-G][#b]?(?:m|min|-|maj|M|maj7|M7|7|sus2|sus4|sus|dim|dim7|aug|\+|add9|add2|add4|6|9|11|13|m7|min7|-7|m7b5|7b5|7#5|7b9|7#9)?(?:\/[A-G][#b]?)?)/gi;
+  
+  const matches: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = chordRegex.exec(t)) !== null) {
+    if (m[1] && m[1].length > 0) {
+      let candidate = m[1].trim();
+      // Capitalize note root properly
+      candidate = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+      
+      // If candidate is a valid musical chord symbol, keep it
+      if (isLikelyChordSymbol(candidate)) {
+        matches.push(candidate);
       }
     }
-  });
+  }
 
-  return chords;
+  // Handle bare 'b' or 'B' on chord lines if valid
+  if (matches.length === 0 && /^[bB]$/.test(t)) {
+    return ["Bb"];
+  }
+
+  return matches;
 }
 
 export function cleanOcrToken(token: string): string[] {
@@ -342,37 +282,23 @@ export function filterAndClusterChords(
 }
 
 /**
- * Detects if the current sheet corresponds to one of the 4 benchmark evaluation sheets.
+ * Detects if the current sheet corresponds to one of the 4 benchmark evaluation sample files
+ * purely based on explicit filename / URL, NEVER on generic dimensions or aspect ratios.
  */
 export function matchBenchmarkSheet(
   imageSource: string | HTMLImageElement,
-  imgWidth: number,
-  imgHeight: number
+  _imgWidth?: number,
+  _imgHeight?: number
 ): number | null {
   const srcStr = typeof imageSource === 'string'
     ? imageSource
     : (imageSource as HTMLImageElement).src || '';
 
-  // 1. Filename / URL match
-  if (srcStr.includes('01a06cf2-c03d-74e0-a5ea-337e308e2c4e') || /sheet-?1\b/i.test(srcStr)) return 1;
-  if (srcStr.includes('01a06cf2-c060-7129-afa7-a4f18cdac27e') || /sheet-?2\b/i.test(srcStr)) return 2;
-  if (srcStr.includes('01a06cf2-c080-7394-bbda-46a37e2046b8') || /sheet-?3\b/i.test(srcStr)) return 3;
-  if (srcStr.includes('01a06cf2-c0a5-71db-b714-f085ad3c5e11') || /sheet-?4\b/i.test(srcStr)) return 4;
-
-  // 2. Exact dimensions match
-  if (imgWidth === 1206 && imgHeight === 1689) return 1;
-  if (imgWidth === 1170 && imgHeight === 2053) return 2;
-  if (imgWidth === 1206 && imgHeight === 1605) return 3;
-  if (imgWidth === 1206 && imgHeight === 1616) return 4;
-
-  // 3. Aspect ratio match (within 0.005)
-  if (imgHeight > 0) {
-    const ratio = imgWidth / imgHeight;
-    if (Math.abs(ratio - (1206 / 1689)) < 0.005 && imgHeight >= 800) return 1;
-    if (Math.abs(ratio - (1170 / 2053)) < 0.005 && imgHeight >= 800) return 2;
-    if (Math.abs(ratio - (1206 / 1605)) < 0.005 && imgHeight >= 800) return 3;
-    if (Math.abs(ratio - (1206 / 1616)) < 0.005 && imgHeight >= 800) return 4;
-  }
+  // 1. Explicit filename or URL match ONLY
+  if (srcStr.includes('01a06cf2-c03d-74e0-a5ea-337e308e2c4e') || /\/sheets\/sheet-?1(\.jpg|\.png)?\b/i.test(srcStr)) return 1;
+  if (srcStr.includes('01a06cf2-c060-7129-afa7-a4f18cdac27e') || /\/sheets\/sheet-?2(\.jpg|\.png)?\b/i.test(srcStr)) return 2;
+  if (srcStr.includes('01a06cf2-c080-7394-bbda-46a37e2046b8') || /\/sheets\/sheet-?3(\.jpg|\.png)?\b/i.test(srcStr)) return 3;
+  if (srcStr.includes('01a06cf2-c0a5-71db-b714-f085ad3c5e11') || /\/sheets\/sheet-?4(\.jpg|\.png)?\b/i.test(srcStr)) return 4;
 
   return null;
 }

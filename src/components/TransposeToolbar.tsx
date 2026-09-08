@@ -30,6 +30,7 @@ interface TransposeToolbarProps {
   onVisionApiKeyChange?: (key: string) => void;
   visionProvider?: 'openai' | 'gemini';
   onVisionProviderChange?: (provider: 'openai' | 'gemini') => void;
+  onImportChordsClick?: () => void;
 }
 
 export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
@@ -52,6 +53,7 @@ export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
   onVisionApiKeyChange,
   visionProvider = 'openai',
   onVisionProviderChange,
+  onImportChordsClick,
 }) => {
   const [fromKey, setFromKey] = React.useState<string>('C');
   const [toKey, setToKey] = React.useState<string>('Bb');
@@ -205,6 +207,17 @@ export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
               <span className="hidden md:inline">Settings</span>
               <span className="text-[10px] text-slate-400 font-mono">({chordCount})</span>
             </button>
+
+            {/* Quick Import Progression */}
+            {onImportChordsClick && (
+              <button
+                onClick={onImportChordsClick}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 text-xs font-medium transition-colors"
+                title="Paste text progression to auto-place chords"
+              >
+                <span>Import Chords</span>
+              </button>
+            )}
 
             {/* Export Transposed Image */}
             <button
