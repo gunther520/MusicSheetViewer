@@ -1,4 +1,5 @@
 import { ChordPosition } from '../utils/chordUtils';
+import groundTruthData from './groundTruthChords.json';
 
 export interface SampleSheet {
   id: string;
@@ -183,6 +184,46 @@ const rockMeasures = [
 ];
 
 export const SAMPLE_SHEETS: SampleSheet[] = [
+  {
+    id: 'sheet-1-pop',
+    title: 'Test Sheet 1 (48 Chords)',
+    composer: 'Sheet Music 1',
+    genre: 'Pop / Piano',
+    originalKey: 'C',
+    description: 'Full piano sheet music with 48 chords across 6 staves (C, C/E, F, G, Bb, C/Bb, Am, Dm, Db, Gsus4).',
+    imageUrl: '/sheets/sheet1.jpg',
+    defaultChords: groundTruthData['1'] as ChordPosition[],
+  },
+  {
+    id: 'sheet-2-acoustic',
+    title: 'Test Sheet 2 (43 Chords)',
+    composer: 'Sheet Music 2',
+    genre: 'Acoustic / Praise',
+    originalKey: 'G',
+    description: 'Acoustic guitar score with 43 chords across 10 staves (G, Em, C, D, D/F#, Dsus4, G/D, G/B, Am).',
+    imageUrl: '/sheets/sheet2.jpg',
+    defaultChords: groundTruthData['2'] as ChordPosition[],
+  },
+  {
+    id: 'sheet-3-lead',
+    title: 'Test Sheet 3 (29 Chords)',
+    composer: 'Sheet Music 3',
+    genre: 'Lead Sheet',
+    originalKey: 'C',
+    description: 'Melody lead sheet with 29 chords across 6 staves (C, G, F, C/E, Dm, Em, Am).',
+    imageUrl: '/sheets/sheet3.jpg',
+    defaultChords: groundTruthData['3'] as ChordPosition[],
+  },
+  {
+    id: 'sheet-4-extended',
+    title: 'Test Sheet 4 (48 Chords)',
+    composer: 'Sheet Music 4',
+    genre: 'Harmonic Score',
+    originalKey: 'C',
+    description: 'Harmonic sheet music with 48 chords across 6 staves (C, G/B, Am, Bb/G, C/G, F, G/F, Em, Dm, Dm/C, Bb, F/G, G7, Bb/C).',
+    imageUrl: '/sheets/sheet4.jpg',
+    defaultChords: groundTruthData['4'] as ChordPosition[],
+  },
   {
     id: 'pop-ballad',
     title: 'Peaceful Melody (Pop Ballad)',

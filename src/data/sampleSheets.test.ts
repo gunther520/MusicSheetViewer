@@ -9,7 +9,7 @@ describe('SAMPLE_SHEETS', () => {
     SAMPLE_SHEETS.forEach((sheet) => {
       expect(sheet.id).toBeTruthy();
       expect(sheet.title).toBeTruthy();
-      expect(sheet.imageUrl).toContain('data:image/svg+xml');
+      expect(sheet.imageUrl).toMatch(/(?:data:image\/svg\+xml|\/sheets\/sheet\d\.jpg)/);
       expect(sheet.defaultChords.length).toBeGreaterThan(0);
 
       // Verify every chord is recognized and valid

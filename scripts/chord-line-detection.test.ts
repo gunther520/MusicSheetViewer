@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import {
   cleanOcrToken,
   filterAndClusterChords,
   CandidateToken
 } from '../src/services/ocrService';
 import { isLikelyChordSymbol } from '../src/utils/chordUtils';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('End-to-End OCR Chord Detection with Chord Line Sensitivity', () => {
   it('verifies isLikelyChordSymbol allows Bb and Eb', () => {
@@ -31,7 +36,9 @@ describe('End-to-End OCR Chord Detection with Chord Line Sensitivity', () => {
   });
 
   it('runs filterAndClusterChords on ocr_dump and verifies all chord rows', () => {
-    const dump = JSON.parse(fs.readFileSync('/tmp/ocr_dump.json', 'utf8'));
+    const defaultDumpPath = path.join(__dirname, '../tests/fixtures/dumps/sheet1_dump.json');
+    const dumpPath = fs.existsSync('/tmp/ocr_dump.json') ? '/tmp/ocr_dump.json' : defaultDumpPath;
+    const dump = JSON.parse(fs.readFileSync(dumpPath, 'utf8'));
     const tokens: CandidateToken[] = dump.words.map((w: any) => ({
       text: w.text,
       x0: w.bbox.x0,
@@ -41,13 +48,13 @@ describe('End-to-End OCR Chord Detection with Chord Line Sensitivity', () => {
       confidence: w.confidence
     }));
 
-    const lines = dump.lines.map((l: any) => ({
+    const lines = (dump.lines || []).map((l: any) => ({
       text: l.text,
       bbox: l.bbox,
       confidence: l.confidence
     }));
 
-    const symbols = dump.symbols.map((s: any) => ({
+    const symbols = (dump.symbols || []).map((s: any) => ({
       text: s.text,
       bbox: s.bbox,
       confidence: s.confidence

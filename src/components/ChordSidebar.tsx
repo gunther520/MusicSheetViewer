@@ -9,6 +9,7 @@ interface ChordSidebarProps {
   accidentalPreference: AccidentalPreference;
   activeChordId: string | null;
   onSelectChord: (id: string) => void;
+  onEditChord?: (chord: ChordPosition) => void;
   onAddChordClick: () => void;
   onDeleteChord: (id: string) => void;
   showOverlayChords: boolean;
@@ -21,6 +22,7 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
   accidentalPreference,
   activeChordId,
   onSelectChord,
+  onEditChord,
   onAddChordClick,
   onDeleteChord,
   showOverlayChords,
@@ -216,28 +218,42 @@ export const ChordSidebar: React.FC<ChordSidebarProps> = ({
 
                 <div className="flex items-center gap-1">
                   <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSelectChord(chord.id);
+                      if (onEditChord) {
+                        onEditChord(chord);
+                      } else {
+                        onSelectChord(chord.id);
+                      }
                     }}
-                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
                     title="Edit chord"
                   >
                     <Edit3 className="w-3 h-3" />
                   </button>
                   <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => handlePlayChord(e, chord.originalText)}
-                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-indigo-300 transition-colors"
+                    className="p-1 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-indigo-300 transition-colors cursor-pointer"
                     title="Play chord audio"
                   >
                     <Volume2 className="w-3 h-3" />
                   </button>
                   <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
                       onDeleteChord(chord.id);
                     }}
-                    className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                    className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
                     title="Delete chord"
                   >
                     <Trash2 className="w-3 h-3" />

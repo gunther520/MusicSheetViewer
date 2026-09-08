@@ -55,6 +55,24 @@ export const SheetViewer: React.FC<SheetViewerProps> = ({
     setZoom(1);
   }, [imageUrl]);
 
+  // Keyboard shortcut: Delete / Backspace removes selected chord
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const tagName = activeEl?.tagName?.toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || (activeEl as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && activeChordId) {
+        e.preventDefault();
+        onDeleteChord(activeChordId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeChordId, onDeleteChord]);
+
   const handleZoomIn = () => setZoom((prev) => Math.min(2.5, prev + 0.2));
   const handleZoomOut = () => setZoom((prev) => Math.max(0.5, prev - 0.2));
   const handleZoomReset = () => setZoom(1);
@@ -85,6 +103,11 @@ export const SheetViewer: React.FC<SheetViewerProps> = ({
 
   // Drag & drop logic for moving chords
   const handleChordMouseDown = (e: React.MouseEvent, chord: ChordPosition) => {
+    // If clicking an interactive button or action, do not drag
+    if ((e.target as HTMLElement).closest('button, input, a')) {
+      return;
+    }
+
     e.stopPropagation();
     setDraggingChordId(chord.id);
     onSelectChord(chord.id);
@@ -263,41 +286,54 @@ export const SheetViewer: React.FC<SheetViewerProps> = ({
                       </span>
                     )}
 
-                    {/* Quick action buttons on hover */}
+                    {/* Quick action buttons on hover / selection */}
                     {(isHovered || isSelected) && !isDragging && (
-                      <div className="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-700">
+                      <div
+                        className="flex items-center gap-0.5 ml-1 pl-1 border-l border-slate-700"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             chordPlayer.playChord(transposed);
                           }}
-                          className="p-0.5 text-slate-400 hover:text-indigo-300 rounded hover:bg-slate-800"
+                          className="p-1 text-slate-400 hover:text-indigo-300 rounded hover:bg-slate-800 transition-colors cursor-pointer"
                           title="Play Audio"
                         >
-                          <Volume2 className="w-3 h-3" />
+                          <Volume2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditChord(chord);
                           }}
-                          className="p-0.5 text-slate-400 hover:text-white rounded hover:bg-slate-800"
-                          title="Edit"
+                          className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Edit Chord"
                         >
-                          <Edit3 className="w-3 h-3" />
+                          <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             onDeleteChord(chord.id);
                           }}
-                          className="p-0.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded transition-colors"
-                          title="Quick Remove"
+                          className="p-1 text-rose-400 hover:text-white hover:bg-rose-600 rounded transition-colors cursor-pointer"
+                          title="Delete Chord"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     )}

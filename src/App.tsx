@@ -143,6 +143,11 @@ export const App: React.FC = () => {
   const handleDeleteChord = (id: string) => {
     setChords((prev) => prev.filter((c) => c.id !== id));
     if (activeChordId === id) setActiveChordId(null);
+    if (editingChord?.id === id) {
+      setEditingChord(null);
+      setIsEditorOpen(false);
+    }
+    showNotification('Chord deleted successfully');
   };
 
   const handleResetChords = () => {
@@ -323,6 +328,7 @@ export const App: React.FC = () => {
                 const found = chords.find((c) => c.id === id);
                 if (found) setEditingChord(found);
               }}
+              onEditChord={handleEditChord}
               onAddChordClick={() => handleAddChordAtPosition(50, 20)}
               onDeleteChord={handleDeleteChord}
               showOverlayChords={showOverlayChords}

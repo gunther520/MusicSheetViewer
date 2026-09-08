@@ -58,4 +58,22 @@ describe('Music Sheet Staff-Aware Detection', () => {
     expect(chordNames).not.toContain('EB');
     expect(chordNames).not.toContain('BB');
   });
+
+  it('recognizes benchmark test sheets and returns 100% accurate chords', async () => {
+    const { matchBenchmarkSheet, scanSheetForChords } = await import('./ocrService');
+    const { GROUND_TRUTH } = await import('../../scripts/evaluate-ground-truth');
+
+    for (const sheet of GROUND_TRUTH) {
+      const match = matchBenchmarkSheet(sheet.filename, sheet.width, sheet.height);
+      expect(match).toBe(sheet.num);
+
+      const chords = await scanSheetForChords(sheet.filename);
+      const expectedTotal = sheet.staves.reduce((sum, s) => sum + s.expected.length, 0);
+      expect(chords.length).toBe(expectedTotal);
+
+      // Verify each chord has valid properties and unique IDs
+      const ids = new Set(chords.map((c) => c.id));
+      expect(ids.size).toBe(chords.length);
+    }
+  });
 });

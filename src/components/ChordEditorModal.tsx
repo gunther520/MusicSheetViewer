@@ -127,11 +127,14 @@ export const ChordEditorModal: React.FC<ChordEditorModalProps> = ({
         {/* Action buttons */}
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-800">
           <button
-            onClick={() => {
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               onDelete(chord.id);
               onClose();
             }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs font-semibold transition-colors cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete

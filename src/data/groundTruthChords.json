@@ -1,0 +1,1690 @@
+{
+  "1": [
+    {
+      "id": "chord-s1-1",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 18.1,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.8
+    },
+    {
+      "id": "chord-s1-2",
+      "originalText": "C/E",
+      "currentText": "C/E",
+      "x": 28,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.7
+    },
+    {
+      "id": "chord-s1-3",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 38.6,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-4",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 47.3,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.9
+    },
+    {
+      "id": "chord-s1-5",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 57.8,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.83
+    },
+    {
+      "id": "chord-s1-6",
+      "originalText": "C/E",
+      "currentText": "C/E",
+      "x": 67.7,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.89
+    },
+    {
+      "id": "chord-s1-7",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 78.6,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-8",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 89.1,
+      "y": 20.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-9",
+      "originalText": "Bb",
+      "currentText": "Bb",
+      "x": 9.2,
+      "y": 28.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.79
+    },
+    {
+      "id": "chord-s1-10",
+      "originalText": "C/Bb",
+      "currentText": "C/Bb",
+      "x": 18.7,
+      "y": 28.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.22
+    },
+    {
+      "id": "chord-s1-11",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 28.3,
+      "y": 28.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-12",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 37.1,
+      "y": 28.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.95
+    },
+    {
+      "id": "chord-s1-13",
+      "originalText": "Db",
+      "currentText": "Db",
+      "x": 47.5,
+      "y": 28.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.58
+    },
+    {
+      "id": "chord-s1-14",
+      "originalText": "Gsus4",
+      "currentText": "Gsus4",
+      "x": 68.5,
+      "y": 28.3,
+      "width": 4.2,
+      "height": 2.5,
+      "confidence": 0.8
+    },
+    {
+      "id": "chord-s1-15",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 83.6,
+      "y": 28.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.9
+    },
+    {
+      "id": "chord-s1-16",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 25.2,
+      "y": 38.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.75
+    },
+    {
+      "id": "chord-s1-17",
+      "originalText": "C/E",
+      "currentText": "C/E",
+      "x": 37.7,
+      "y": 38.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s1-18",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 50.9,
+      "y": 38.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-19",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 58.4,
+      "y": 38.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-20",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 70.8,
+      "y": 38.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.72
+    },
+    {
+      "id": "chord-s1-21",
+      "originalText": "C/E",
+      "currentText": "C/E",
+      "x": 83.9,
+      "y": 38.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.94
+    },
+    {
+      "id": "chord-s1-22",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 9.6,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-23",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 16.7,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s1-24",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 25.3,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-25",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 39.1,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s1-26",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 54.7,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-27",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 62.6,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s1-28",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 74.7,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s1-29",
+      "originalText": "F/G",
+      "currentText": "F/G",
+      "x": 85.1,
+      "y": 53.8,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.94
+    },
+    {
+      "id": "chord-s1-30",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 10,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s1-31",
+      "originalText": "Bb/C",
+      "currentText": "Bb/C",
+      "x": 14.5,
+      "y": 71.3,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.58
+    },
+    {
+      "id": "chord-s1-32",
+      "originalText": "C7",
+      "currentText": "C7",
+      "x": 19.4,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-33",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 25.4,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-34",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 32.2,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.95
+    },
+    {
+      "id": "chord-s1-35",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 44.2,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-36",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 48,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-37",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 59.7,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s1-38",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 68.1,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s1-39",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 80.8,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s1-40",
+      "originalText": "Bb/C",
+      "currentText": "Bb/C",
+      "x": 85.9,
+      "y": 71.3,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.49
+    },
+    {
+      "id": "chord-s1-41",
+      "originalText": "C7",
+      "currentText": "C7",
+      "x": 90.9,
+      "y": 71.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-42",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 10,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s1-43",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 21.2,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s1-44",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 35.5,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s1-45",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 44.1,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s1-46",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 56.8,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s1-47",
+      "originalText": "F/G",
+      "currentText": "F/G",
+      "x": 71.4,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.85
+    },
+    {
+      "id": "chord-s1-48",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 86.5,
+      "y": 84.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.68
+    }
+  ],
+  "2": [
+    {
+      "id": "chord-s2-1",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 15.6,
+      "y": 3.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s2-2",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 38.8,
+      "y": 3.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-3",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 60.7,
+      "y": 3.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.78
+    },
+    {
+      "id": "chord-s2-4",
+      "originalText": "D",
+      "currentText": "D",
+      "x": 82.6,
+      "y": 3.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s2-5",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 32.5,
+      "y": 9.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-6",
+      "originalText": "D/F#",
+      "currentText": "D/F#",
+      "x": 47.1,
+      "y": 9.6,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.49
+    },
+    {
+      "id": "chord-s2-7",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 54.1,
+      "y": 9.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.5
+    },
+    {
+      "id": "chord-s2-8",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 74.7,
+      "y": 9.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.85
+    },
+    {
+      "id": "chord-s2-9",
+      "originalText": "D",
+      "currentText": "D",
+      "x": 13.2,
+      "y": 17.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-10",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 42.5,
+      "y": 17.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s2-11",
+      "originalText": "D/F#",
+      "currentText": "D/F#",
+      "x": 60.8,
+      "y": 17.9,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.6
+    },
+    {
+      "id": "chord-s2-12",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 68.6,
+      "y": 17.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-13",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 13.2,
+      "y": 26.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.75
+    },
+    {
+      "id": "chord-s2-14",
+      "originalText": "Dsus4",
+      "currentText": "Dsus4",
+      "x": 52.9,
+      "y": 26.5,
+      "width": 4.2,
+      "height": 2.5,
+      "confidence": 0.9
+    },
+    {
+      "id": "chord-s2-15",
+      "originalText": "D",
+      "currentText": "D",
+      "x": 67.1,
+      "y": 26.5,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s2-16",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 13.3,
+      "y": 35.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s2-17",
+      "originalText": "D/F#",
+      "currentText": "D/F#",
+      "x": 24.7,
+      "y": 35.3,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.29
+    },
+    {
+      "id": "chord-s2-18",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 42.4,
+      "y": 35.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-19",
+      "originalText": "G/D",
+      "currentText": "G/D",
+      "x": 53,
+      "y": 35.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s2-20",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 68.7,
+      "y": 35.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.81
+    },
+    {
+      "id": "chord-s2-21",
+      "originalText": "G/B",
+      "currentText": "G/B",
+      "x": 81.7,
+      "y": 35.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s2-22",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 13.9,
+      "y": 43.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-23",
+      "originalText": "D",
+      "currentText": "D",
+      "x": 26,
+      "y": 43.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-24",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 44.2,
+      "y": 43.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s2-25",
+      "originalText": "D/F#",
+      "currentText": "D/F#",
+      "x": 54.1,
+      "y": 43.4,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.45
+    },
+    {
+      "id": "chord-s2-26",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 70.5,
+      "y": 43.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-27",
+      "originalText": "G/D",
+      "currentText": "G/D",
+      "x": 79.3,
+      "y": 43.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s2-28",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 13.2,
+      "y": 51.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s2-29",
+      "originalText": "G/B",
+      "currentText": "G/B",
+      "x": 29.8,
+      "y": 51.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s2-30",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 47,
+      "y": 51.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-31",
+      "originalText": "D",
+      "currentText": "D",
+      "x": 58.3,
+      "y": 51.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-32",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 77.2,
+      "y": 51.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-33",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 37.7,
+      "y": 74.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.82
+    },
+    {
+      "id": "chord-s2-34",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 68.3,
+      "y": 74.4,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-35",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 13.2,
+      "y": 82.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.85
+    },
+    {
+      "id": "chord-s2-36",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 45.5,
+      "y": 82.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s2-37",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 73.9,
+      "y": 82.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s2-38",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 13.3,
+      "y": 91.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-39",
+      "originalText": "D/F#",
+      "currentText": "D/F#",
+      "x": 20.9,
+      "y": 91.9,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s2-40",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 26.7,
+      "y": 91.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s2-41",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 41.8,
+      "y": 91.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s2-42",
+      "originalText": "Dsus4",
+      "currentText": "Dsus4",
+      "x": 62.1,
+      "y": 91.9,
+      "width": 4.2,
+      "height": 2.5,
+      "confidence": 0.9
+    },
+    {
+      "id": "chord-s2-43",
+      "originalText": "D",
+      "currentText": "D",
+      "x": 72.7,
+      "y": 91.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    }
+  ],
+  "3": [
+    {
+      "id": "chord-s3-1",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 37,
+      "y": 14,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.63
+    },
+    {
+      "id": "chord-s3-2",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 50.9,
+      "y": 14,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-3",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 65.8,
+      "y": 14,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s3-4",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 81.6,
+      "y": 14,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.38
+    },
+    {
+      "id": "chord-s3-5",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 11.1,
+      "y": 24.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-6",
+      "originalText": "C/E",
+      "currentText": "C/E",
+      "x": 25,
+      "y": 24.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s3-7",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 41.9,
+      "y": 24.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s3-8",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 48.7,
+      "y": 24.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.9
+    },
+    {
+      "id": "chord-s3-9",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 65.6,
+      "y": 24.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.9
+    },
+    {
+      "id": "chord-s3-10",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 81.5,
+      "y": 24.9,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s3-11",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 11.1,
+      "y": 35.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-12",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 27.3,
+      "y": 35.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.73
+    },
+    {
+      "id": "chord-s3-13",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 42.7,
+      "y": 35.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-14",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 56.7,
+      "y": 35.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-15",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 72.1,
+      "y": 35.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.77
+    },
+    {
+      "id": "chord-s3-16",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 11.1,
+      "y": 46.2,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-17",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 23.9,
+      "y": 46.2,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-18",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 40.2,
+      "y": 46.2,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s3-19",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 53.2,
+      "y": 46.2,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s3-20",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 69.4,
+      "y": 46.2,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s3-21",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 82.3,
+      "y": 46.2,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-22",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 11,
+      "y": 57.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.64
+    },
+    {
+      "id": "chord-s3-23",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 36.3,
+      "y": 57.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s3-24",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 49.1,
+      "y": 57.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s3-25",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 65.3,
+      "y": 57.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s3-26",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 78.2,
+      "y": 57.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s3-27",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 11,
+      "y": 67.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s3-28",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 22.8,
+      "y": 67.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s3-29",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 37.3,
+      "y": 67.7,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.52
+    }
+  ],
+  "4": [
+    {
+      "id": "chord-s4-1",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 21.5,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.57
+    },
+    {
+      "id": "chord-s4-2",
+      "originalText": "G/B",
+      "currentText": "G/B",
+      "x": 30.1,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s4-3",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 41.3,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-4",
+      "originalText": "Bb/G",
+      "currentText": "Bb/G",
+      "x": 51.9,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.42
+    },
+    {
+      "id": "chord-s4-5",
+      "originalText": "C/G",
+      "currentText": "C/G",
+      "x": 56.1,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.38
+    },
+    {
+      "id": "chord-s4-6",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 60,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.87
+    },
+    {
+      "id": "chord-s4-7",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 67.6,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.57
+    },
+    {
+      "id": "chord-s4-8",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 78.8,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-9",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 86.2,
+      "y": 12.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-10",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 14.5,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.91
+    },
+    {
+      "id": "chord-s4-11",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 24,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.61
+    },
+    {
+      "id": "chord-s4-12",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 35.3,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-13",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 43.4,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-14",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 54.6,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.63
+    },
+    {
+      "id": "chord-s4-15",
+      "originalText": "Dm/C",
+      "currentText": "Dm/C",
+      "x": 67.7,
+      "y": 24.3,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.76
+    },
+    {
+      "id": "chord-s4-16",
+      "originalText": "Bb",
+      "currentText": "Bb",
+      "x": 81.1,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.37
+    },
+    {
+      "id": "chord-s4-17",
+      "originalText": "F/G",
+      "currentText": "F/G",
+      "x": 87.1,
+      "y": 24.3,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.81
+    },
+    {
+      "id": "chord-s4-18",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 12.4,
+      "y": 36.1,
+      "width": 4.9,
+      "height": 2.5,
+      "confidence": 0.31
+    },
+    {
+      "id": "chord-s4-19",
+      "originalText": "G/B",
+      "currentText": "G/B",
+      "x": 23.5,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.41
+    },
+    {
+      "id": "chord-s4-20",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 35.5,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-21",
+      "originalText": "Bb/G",
+      "currentText": "Bb/G",
+      "x": 46.4,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.52
+    },
+    {
+      "id": "chord-s4-22",
+      "originalText": "C/G",
+      "currentText": "C/G",
+      "x": 52.6,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.32
+    },
+    {
+      "id": "chord-s4-23",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 56.1,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.89
+    },
+    {
+      "id": "chord-s4-24",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 64.8,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.47
+    },
+    {
+      "id": "chord-s4-25",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 77.4,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-26",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 85.8,
+      "y": 36.1,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-27",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 13.4,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.75
+    },
+    {
+      "id": "chord-s4-28",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 22.3,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.34
+    },
+    {
+      "id": "chord-s4-29",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 33.2,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-30",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 40.5,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s4-31",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 49.9,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-32",
+      "originalText": "Dm/C",
+      "currentText": "Dm/C",
+      "x": 62.2,
+      "y": 48.6,
+      "width": 3.7,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s4-33",
+      "originalText": "G7",
+      "currentText": "G7",
+      "x": 75.2,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.18
+    },
+    {
+      "id": "chord-s4-34",
+      "originalText": "Bb/C",
+      "currentText": "Bb/C",
+      "x": 83.3,
+      "y": 48.6,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.5
+    },
+    {
+      "id": "chord-s4-35",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 14.2,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.92
+    },
+    {
+      "id": "chord-s4-36",
+      "originalText": "G/F",
+      "currentText": "G/F",
+      "x": 22.2,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.6
+    },
+    {
+      "id": "chord-s4-37",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 34.5,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-38",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 41.5,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-39",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 51.3,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s4-40",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 62.9,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.62
+    },
+    {
+      "id": "chord-s4-41",
+      "originalText": "Em/C",
+      "currentText": "Em/C",
+      "x": 74.7,
+      "y": 60,
+      "width": 3.6,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s4-42",
+      "originalText": "Bb/C",
+      "currentText": "Bb/C",
+      "x": 84.8,
+      "y": 60,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.63
+    },
+    {
+      "id": "chord-s4-43",
+      "originalText": "F",
+      "currentText": "F",
+      "x": 13.7,
+      "y": 72,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.86
+    },
+    {
+      "id": "chord-s4-44",
+      "originalText": "Em",
+      "currentText": "Em",
+      "x": 33.2,
+      "y": 72,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-45",
+      "originalText": "Am",
+      "currentText": "Am",
+      "x": 42.8,
+      "y": 72,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.96
+    },
+    {
+      "id": "chord-s4-46",
+      "originalText": "Dm",
+      "currentText": "Dm",
+      "x": 52.6,
+      "y": 72,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.97
+    },
+    {
+      "id": "chord-s4-47",
+      "originalText": "G",
+      "currentText": "G",
+      "x": 65.3,
+      "y": 72,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.93
+    },
+    {
+      "id": "chord-s4-48",
+      "originalText": "C",
+      "currentText": "C",
+      "x": 78.4,
+      "y": 72,
+      "width": 3.5,
+      "height": 2.5,
+      "confidence": 0.83
+    }
+  ]
+}
