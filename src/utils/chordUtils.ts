@@ -54,10 +54,16 @@ export const EXCLUDED_COMMON_WORDS = new Set([
   'THE', 'IN', 'ON', 'AT', 'TO', 'BY', 'IT', 'IS', 'AS', 'BE', 'HE', 'ME', 'MY', 'WE', 'SO', 'NO', 'DO', 'GO', 'OR', 'IF', 'UP', 'AND', 'FOR',
   'OF', 'WITH', 'YOU', 'YOUR', 'ALL', 'ARE', 'WAS', 'WERE', 'OUT', 'DAY', 'SEE', 'FACE', 'LORD', 'LIFE', 'KING', 'WILL', 'DONE', 'COME',
   'DOWN', 'JOY', 'LOVE', 'LIGHT', 'NOT', 'BUT', 'FROM', 'THEY', 'THEM', 'HER', 'HIS', 'OUR', 'WHO', 'WHAT', 'HOW', 'WHEN', 'ONCE', 'BACK',
-  'GIVE', 'SACRIFICE', 'WORSHIP', 'HOLY', 'SPIRIT', 'REIGN', 'PRAISE',
+  'GIVE', 'SACRIFICE', 'WORSHIP', 'HOLY', 'SPIRIT', 'REIGN', 'PRAISE', 'WALK', 'STAND', 'HEAR', 'TELL', 'SING', 'SONG', 'SOUND',
+  'BLOOD', 'LAMB', 'PEACE', 'GRACE', 'SINS', 'GRIEFS', 'BEAR', 'PRAYER', 'EVER', 'ALWAYS', 'FRIEND', 'EMBRACE', 'STRENGTH',
+  'DID', 'CAN', 'CAME', 'END', 'FAR', 'GET', 'GOT', 'GOOD', 'GREAT', 'GAVE', 'HAD', 'HAS', 'HAVE', 'HIM', 'MAN', 'MEN', 'MAY', 'NOW',
+  'NOR', 'NEW', 'OLD', 'ONE', 'SAW', 'SAY', 'SAID', 'SHE', 'THY', 'THEE', 'THOU', 'THEN', 'THAN', 'THIS', 'THAT', 'TOO', 'TWO', 'WAY',
   // Sheet music section headers and publisher text
   'INTRO', 'VERSE', 'CHORUS', 'BRIDGE', 'OUTRO', 'ENDING', 'CODA', 'REFRAIN', 'HOOK', 'SOLO', 'INTERLUDE', 'TAG',
   'COPYRIGHT', 'CCLI', 'BMI', 'STREAM', 'MUSIC', 'PAGE', 'SONG', 'KEY', 'TIME', 'TEMPO',
+  'CHORD', 'CHORDS', 'LEAD', 'SHEET', 'MEASURE', 'BAR', 'STAFF', 'STAVES', 'TREBLE', 'BASS', 'CLEF',
+  // Musical dynamics & performance markings
+  'MF', 'MP', 'FFF', 'PPP', 'SFZ', 'CRESC', 'RIT', 'ACCEL',
   // OCR artifacts / syllables frequently misread from sheet music notes & lyrics
   // Note: 'BB' and 'EB' are checked separately so real chords 'Bb' and 'Eb' are not blocked
   'EE', 'AA', 'CC', 'DD', 'FF', 'GG', 'BA', 'CA', 'DA', 'FA', 'GA',
@@ -66,7 +72,10 @@ export const EXCLUDED_COMMON_WORDS = new Set([
 
 // Lowercase tokens that represent words in lyrics rather than chords (e.g. "a", "am", "em", "b", "in")
 export const EXCLUDED_LOWERCASE_WORDS = new Set([
-  'a', 'am', 'an', 'as', 'at', 'be', 'by', 'do', 'em', 'go', 'he', 'if', 'in', 'is', 'it', 'me', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'we'
+  'a', 'am', 'an', 'as', 'at', 'be', 'by', 'do', 'em', 'go', 'he', 'if', 'in', 'is', 'it', 'me', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'we',
+  'did', 'are', 'all', 'and', 'can', 'come', 'came', 'day', 'end', 'for', 'from', 'far', 'get', 'got', 'good', 'great', 'give', 'gave',
+  'had', 'has', 'have', 'him', 'his', 'her', 'how', 'into', 'like', 'man', 'men', 'may', 'now', 'not', 'nor', 'new', 'old', 'one', 'out', 'our',
+  'see', 'saw', 'say', 'said', 'she', 'the', 'thy', 'thee', 'thou', 'then', 'than', 'this', 'that', 'too', 'two', 'was', 'were', 'who', 'why', 'way', 'will', 'with', 'you', 'your'
 ]);
 
 /**
@@ -263,8 +272,10 @@ export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): 
     return false;
   }
 
-  // Filter lowercase words in lyrics (e.g. "a", "am", "em", "b")
-  if (!allowSingleLetterA && EXCLUDED_LOWERCASE_WORDS.has(cleaned)) {
+  // Filter lowercase words in lyrics (e.g. "a", "am", "em", "b", "in")
+  // Only check EXCLUDED_LOWERCASE_WORDS if the token is completely lowercase.
+  // Capitalized chord symbols like "Am" (A minor) and "Em" (E minor) must never be blocked.
+  if (cleaned === cleaned.toLowerCase() && EXCLUDED_LOWERCASE_WORDS.has(cleaned)) {
     return false;
   }
 
@@ -275,6 +286,12 @@ export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): 
   // Allowed roots: A-G with optional # or b
   const root = parsed.root;
   if (!/^[A-G][#b]?$/.test(root)) return false;
+
+  // If bass note is present, it must be a valid note and NOT identical to the root (e.g. D/D or C/C is redundant/artifact)
+  if (parsed.bass) {
+    if (!/^[A-G][#b]?$/.test(parsed.bass)) return false;
+    if (parsed.bass.toUpperCase() === root.toUpperCase()) return false;
+  }
 
   // Validate quality contains musical chord suffixes
   const validQualities = [

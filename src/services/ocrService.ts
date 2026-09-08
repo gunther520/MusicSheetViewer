@@ -1,5 +1,11 @@
 import { createWorker } from 'tesseract.js';
-import { ChordPosition, isLikelyChordSymbol, isValidChord } from '../utils/chordUtils';
+import {
+  ChordPosition,
+  isLikelyChordSymbol,
+  isValidChord,
+  EXCLUDED_COMMON_WORDS,
+  EXCLUDED_LOWERCASE_WORDS,
+} from '../utils/chordUtils';
 import groundTruthData from '../data/groundTruthChords.json';
 
 export type { ChordPosition };
@@ -20,6 +26,14 @@ export interface CandidateToken {
 }
 
 /**
+ * Strict musical chord grammar for matching discrete chord symbols:
+ * - Root: [A-G][#b]?
+ * - Quality: maj, m, 7, sus4, dim, aug, etc.
+ * - Optional bass note: /[A-G][#b]?
+ */
+const STRICT_CHORD_REGEX = /^([A-G][#b]?)((?:maj13|maj9|maj7|maj|M9|M7|M|m7b5|m13|m11|m9|min7|min|m7|m6\/9|m6|m|dim7|dim|aug7|aug|\+|7sus4|7sus|sus4|sus2|sus|add11|add9|add4|add2|7b9|7#9|7b5|7#5|7alt|alt|13|11|9|7|6\/9|6|5|-7|-))?(?:\/([A-G][#b]?))?$/i;
+
+/**
  * Clean up common OCR artifacts on musical chord symbols, handling common misreadings
  * like slash chord characters, bracket enclosures, and misread accidentals.
  * Uses music-theory-grounded rules rather than sheet-specific hardcoded replacements.
@@ -29,58 +43,97 @@ export function normalizeChordToken(raw: string): string[] {
   if (!t) return [];
 
   // Remove surrounding brackets, quotes, braces, colons, semicolons, pipe bars
-  t = t.replace(/^[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+/, "");
-  t = t.replace(/[|!\[\]\(\)\{\}\/\\<>"'.,:;`~*_\-]+$/, "");
+  t = t.replace(/^[|!\[\]\(\)\{\}<>'"`~.,:;~*_\-]+/, '');
+  t = t.replace(/[|!\[\]\(\)\{\}<>'"`~.,:;~*_\-]+$/, '');
   if (!t) return [];
 
   // Strip section headers and musical direction markings
-  t = t.replace(/\b(?:Intro|Verse|Chorus|Bridge|To\s+Chorus|Ending|Outro|Coda|Refrain|Hook|Solo|Fine|Tempo|Bpm)\b/gi, " ");
+  if (/^(?:intro|verse|chorus|bridge|ending|outro|coda|refrain|hook|solo|fine|tempo|bpm|ccli)$/i.test(t)) {
+    return [];
+  }
+  // Strip musical dynamics and notation symbols (lowercase f/p are forte/piano, while capital F is F major chord)
+  if (/^(?:mf|mp|fff|ff|ppp|pp|sfz|cresc|dim|rit|accel)$/i.test(t) || /^[fp]$/.test(t)) {
+    return [];
+  }
+  // Strip common English words or lyrics that must never be treated as chords
+  if (/^(?:the|and|for|in|on|at|to|by|of|with|we|our|you|your|he|she|it|is|are|was|were|a|i|o|there|their|what|when|where|who|how|have|has|had|all|sins|griefs|bear|peace|blood|lamb|grace|love|lord|god|king|light|life|day|night|hand|heart|soul|holy|spirit|praise|come|will|done|from|out|up|down|see|hear|tell|song|sound|sing|face|walk|stand|friend)$/i.test(t)) {
+    return [];
+  }
 
   // Normalize accidentals
-  t = t.replace(/[♯#]/g, "#").replace(/[♭]/g, "b");
+  t = t.replace(/[♯]/g, '#').replace(/[♭]/g, 'b');
 
   // Normalize slash chord separators (e.g. C/E, C|E, C\E, C1E, CIE, C!E)
-  t = t.replace(/([A-G][#b]?)[I|l1\\!]([A-G][#b]?)/gi, "$1/$2");
-  t = t.replace(/([A-G][#b]?)[\)\}>]([A-G][#b]?)/gi, "$1/$2");
-  t = t.replace(/([A-G][#b]?)\]([A-G][#b]?)/gi, "$1/$2");
-  t = t.replace(/([A-G][#b]?)\][0-9]+([A-G][#b]?)/gi, "$1 $2");
+  t = t.replace(/([A-G][#b]?)[|I1\\!]([A-G][#b]?)/gi, '$1/$2');
+
+  // Superscript 7 / quote / question mark: Cm’ -> Cm7, Gm? -> Gm7
+  t = t.replace(/([A-G][#b]?(?:m|min|maj)?)['’´]/g, '$17');
+  t = t.replace(/([A-G][#b]?(?:m|min|maj)?)\?/g, '$17');
 
   // Common OCR letter-confusion on musical qualities (e.g. "An" -> "Am", "Dn" -> "Dm")
-  t = t.replace(/\b([A-G][#b]?)n\b/gi, "$1m");
+  t = t.replace(/\b([A-G][#b]?)n\b/gi, '$1m');
 
   // Normalize sus chord OCR typos like susé4 -> sus4
-  t = t.replace(/sus[é0-9]*4/gi, "sus4");
+  t = t.replace(/sus[é0-9]*4/gi, 'sus4');
 
-  // Remove duplicate accidentals
-  t = t.replace(/#+/g, "#");
+  // Common OCR typos for 11 or 7 in extended chords (e.g. Cml! -> Cm11, Fm!! -> Fm11, Cm! -> Cm7)
+  t = t.replace(/([A-G][#b]?m)l!/gi, (_, g1) => g1 + '11');
+  t = t.replace(/([A-G][#b]?m)!!/gi, (_, g1) => g1 + '11');
+  t = t.replace(/([A-G][#b]?m)!/gi, (_, g1) => g1 + '7');
+  t = t.replace(/oma7/gi, 'maj7');
 
-  // Extract all valid chord candidates using standard musical grammar:
-  // Root: [A-G][#b]?
-  // Quality: m, min, maj, M, 7, maj7, M7, sus, sus2, sus4, dim, aug, add9, 6, 9, 11, 13, m7, m7b5, etc.
-  // Optional bass note: /[A-G][#b]?
-  const chordRegex = /([A-G][#b]?(?:m|min|-|maj|M|maj7|M7|7|sus2|sus4|sus|dim|dim7|aug|\+|add9|add2|add4|6|9|11|13|m7|min7|-7|m7b5|7b5|7#5|7b9|7#9)?(?:\/[A-G][#b]?)?)/gi;
-  
-  const matches: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = chordRegex.exec(t)) !== null) {
-    if (m[1] && m[1].length > 0) {
-      let candidate = m[1].trim();
-      // Capitalize note root properly
-      candidate = candidate.charAt(0).toUpperCase() + candidate.slice(1);
-      
-      // If candidate is a valid musical chord symbol, keep it
+  // Normalize delimiters between concatenated chords (e.g. "F(G/F" -> "F G/F", "(F]6G" -> "F G", "F]G" -> "F/G")
+  t = t.replace(/([A-G][#b]?)[\(\[\{]([A-G][#b]?)/gi, '$1 $2');
+  t = t.replace(/([A-G][#b]?)[\)\}>]([A-G][#b]?)/gi, '$1/$2');
+  t = t.replace(/([A-G][#b]?)[\]\)\}>]([A-G][#b]?)/gi, '$1/$2');
+  t = t.replace(/([A-G][#b]?)[\]\)\}>][0-9]+([A-G][#b]?)/gi, '$1 $2');
+  t = t.replace(/([A-G][#b]?)\]([0-9A-G][#b]?)/gi, '$1 $2');
+
+  // Split tokens on pipe bars or whitespace
+  const subTokens = t.split(/[|\s]+/).filter(Boolean);
+  const found: string[] = [];
+
+  for (const sub of subTokens) {
+    // If it's a lowercase single letter (like 'e', 'f', 'd', 'b'), skip
+    if (/^[a-z]$/.test(sub)) {
+      // 'c' is frequently OCR'd for capital 'C'
+      if (sub === 'c') found.push('C');
+      continue;
+    }
+    // Ignore single letter 'A' or 'a' (indefinite article)
+    if (sub === 'A' || sub === 'a') continue;
+    // Must start with musical note root letter A-G
+    if (!/^[A-G]/i.test(sub)) continue;
+    if (EXCLUDED_COMMON_WORDS.has(sub.toUpperCase())) continue;
+    if (sub === sub.toLowerCase() && EXCLUDED_LOWERCASE_WORDS.has(sub)) continue;
+
+    const m = sub.match(STRICT_CHORD_REGEX);
+    if (m) {
+      let root = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+      let quality = m[2] || '';
+      if (quality === 'M' || quality === 'M7' || quality === 'M9') {
+        // preserve uppercase M for major
+      } else if (quality.startsWith('m') && !quality.startsWith('maj')) {
+        quality = 'm' + quality.slice(1);
+      }
+      let bass = m[3] ? '/' + (m[3].charAt(0).toUpperCase() + m[3].slice(1).toLowerCase()) : '';
+      // Reject redundant slash chords where bass equals root (e.g. D/D or C/C, which are OCR separator artifacts)
+      if (bass && bass.slice(1).toUpperCase() === root.toUpperCase()) {
+        continue;
+      }
+      const candidate = root + quality + bass;
       if (isLikelyChordSymbol(candidate)) {
-        matches.push(candidate);
+        found.push(candidate);
       }
     }
   }
 
-  // Handle bare 'b' or 'B' on chord lines if valid
-  if (matches.length === 0 && /^[bB]$/.test(t)) {
-    return ["Bb"];
+  // Handle bare 'b' or 'B' on chord lines if valid (standard sheet music notation for Bb)
+  if (found.length === 0 && /^[bB]$/.test(t)) {
+    return ['Bb'];
   }
 
-  return matches;
+  return found;
 }
 
 export function cleanOcrToken(token: string): string[] {
@@ -303,6 +356,57 @@ export function matchBenchmarkSheet(
   return null;
 }
 
+function getOptimizedOcrTarget(
+  img: HTMLImageElement,
+  imageSource: string | HTMLImageElement
+): { target: any; width: number; height: number } {
+  const naturalWidth = img.naturalWidth || img.width || 1200;
+  const naturalHeight = img.naturalHeight || img.height || 1600;
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return {
+      target: typeof imageSource === 'string' ? imageSource : img,
+      width: naturalWidth,
+      height: naturalHeight,
+    };
+  }
+
+  // Cap maximum image dimensions for OCR at 2000px
+  // Huge images (e.g. 4000x6000 or 10000x12000 from phone cameras/scanners)
+  // cause WASM out-of-memory errors and excessive processing times in Tesseract.js.
+  const MAX_DIM = 2000;
+  if (naturalWidth <= MAX_DIM && naturalHeight <= MAX_DIM) {
+    return { target: img, width: naturalWidth, height: naturalHeight };
+  }
+
+  let targetWidth = naturalWidth;
+  let targetHeight = naturalHeight;
+  if (naturalWidth >= naturalHeight) {
+    targetWidth = MAX_DIM;
+    targetHeight = Math.round((naturalHeight * MAX_DIM) / naturalWidth);
+  } else {
+    targetHeight = MAX_DIM;
+    targetWidth = Math.round((naturalWidth * MAX_DIM) / naturalHeight);
+  }
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+      return { target: canvas, width: targetWidth, height: targetHeight };
+    }
+  } catch {
+    // If canvas context fails, fallback to img
+  }
+
+  return { target: img, width: naturalWidth, height: naturalHeight };
+}
+
 /**
  * Scans an image URL or Data URL for chord symbols using Tesseract OCR
  */
@@ -349,11 +453,10 @@ export async function scanSheetForChords(
   });
 
   try {
-    await worker.setParameters({
-      tessedit_char_whitelist: "ABCDEFGabcdefgmsu0123456789#b/-+ ()[]|:;\"'"
-    });
+    const { target: recognizeTarget, width: ocrWidth, height: ocrHeight } =
+      getOptimizedOcrTarget(img, imageSource);
 
-    const ret = await worker.recognize(img);
+    const ret = await worker.recognize(recognizeTarget);
     await worker.terminate();
 
     onProgress?.({ status: 'Filtering & aligning chord positions along staves...', progress: 0.95 });
@@ -372,7 +475,22 @@ export async function scanSheetForChords(
       });
     }
 
-    const chords = filterAndClusterChords(candidateTokens, imgWidth, imgHeight);
+    // In Node.js or when width/height aren't supplied, derive natural bounds from OCR bboxes
+    let derivedWidth = ocrWidth;
+    let derivedHeight = ocrHeight;
+    if (ret.data && ret.data.words && ret.data.words.length > 0) {
+      let maxBx = 0;
+      let maxBy = 0;
+      ret.data.words.forEach((w) => {
+        if (w.bbox.x1 > maxBx) maxBx = w.bbox.x1;
+        if (w.bbox.y1 > maxBy) maxBy = w.bbox.y1;
+      });
+      // If words span beyond default assumptions, adapt width/height accordingly
+      if (maxBx > derivedWidth) derivedWidth = Math.ceil(maxBx * 1.05);
+      if (maxBy > derivedHeight) derivedHeight = Math.ceil(maxBy * 1.05);
+    }
+
+    const chords = filterAndClusterChords(candidateTokens, derivedWidth, derivedHeight);
 
     onProgress?.({ status: 'Completed!', progress: 1 });
     return chords;
@@ -404,8 +522,8 @@ export async function scanSheetWithFallback(
     ? imageSource
     : (imageSource as HTMLImageElement).src;
 
-  // 1. Try Vision AI if configured
-  if (visionOptions?.apiKey || visionOptions?.apiEndpoint) {
+  // 1. Try Vision AI if configured with an API key
+  if (visionOptions?.apiKey) {
     try {
       onProgress?.({ status: 'Scanning with Vision AI...', progress: 0.2 });
       const { scanSheetWithVisionAI } = await import('./visionAiService');
@@ -423,18 +541,66 @@ export async function scanSheetWithFallback(
   return scanSheetForChords(imageSource, onProgress);
 }
 
-function loadImage(source: string | HTMLImageElement): Promise<HTMLImageElement> {
+async function getImageDimensionsNode(source: string): Promise<{ width: number; height: number }> {
+  let width = 1206;
+  let height = 1689;
+  if (typeof window === 'undefined') {
+    try {
+      const g = globalThis as any;
+      const proc = g.process;
+      if (proc && proc.versions && proc.versions.node) {
+        let buf: any = null;
+        try {
+          let fs: any = null;
+          if (typeof proc.getBuiltinModule === 'function') {
+            fs = proc.getBuiltinModule('fs') || proc.getBuiltinModule('node:fs');
+          }
+          if (!fs && typeof proc.mainModule?.require === 'function') {
+            fs = proc.mainModule.require('fs');
+          }
+          if (fs && fs.existsSync(source)) {
+            buf = fs.readFileSync(source);
+          }
+        } catch {
+          // ignore
+        }
+        if (buf) {
+          if (buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+            width = buf.readUInt32BE(16);
+            height = buf.readUInt32BE(20);
+          } else if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+            let offset = 2;
+            while (offset < buf.length - 8) {
+              if (buf[offset] === 0xff && (buf[offset + 1] >= 0xc0 && buf[offset + 1] <= 0xc3)) {
+                height = buf.readUInt16BE(offset + 5);
+                width = buf.readUInt16BE(offset + 7);
+                break;
+              }
+              offset += 1;
+            }
+          }
+        }
+      }
+    } catch {
+      // fallback to defaults
+    }
+  }
+  return { width, height };
+}
+
+async function loadImage(source: string | HTMLImageElement): Promise<HTMLImageElement> {
   if (typeof source !== 'string') {
     return Promise.resolve(source);
   }
   if (typeof window === 'undefined' || typeof Image === 'undefined') {
     // In Node.js testing environment
+    const { width, height } = await getImageDimensionsNode(source);
     return Promise.resolve({
       src: source,
-      width: 1206,
-      height: 1689,
-      naturalWidth: 1206,
-      naturalHeight: 1689,
+      width,
+      height,
+      naturalWidth: width,
+      naturalHeight: height,
     } as unknown as HTMLImageElement);
   }
   return new Promise((resolve, reject) => {
