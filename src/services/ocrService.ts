@@ -29,9 +29,9 @@ export interface CandidateToken {
  * Strict musical chord grammar for matching discrete chord symbols:
  * - Root: [A-G][#b]?
  * - Quality: maj, m, 7, sus4, dim, aug, etc.
- * - Optional bass note: /[A-G][#b]?
+ * - Optional bass note: /[A-G][#b]?[0-9]*
  */
-const STRICT_CHORD_REGEX = /^([A-G][#b]?)((?:maj13|maj9|maj7|maj|M9|M7|M|m7b5|m13|m11|m9|min7|min|m7|m6\/9|m6|m|dim7|dim|aug7|aug|\+|7sus4|7sus|sus4|sus2|sus|add11|add9|add4|add2|7b9|7#9|7b5|7#5|7alt|alt|13|11|9|7|6\/9|6|5|-7|-))?(?:\/([A-G][#b]?))?$/i;
+const STRICT_CHORD_REGEX = /^([A-G][#b]?)((?:maj13|maj9|maj7|maj|M9|M7|M|m7b5|m13|m11|m9|min7|min|m7|m6\/9|m6|m|dim7|dim|aug7|aug|\+|7sus4|7sus|sus4|sus2|sus|add11|add9|add4|add2|7b9|7#9|7b5|7#5|7alt|alt|13|11|9|7|6\/9|6|5|-7|-))?(?:\/([A-G][#b]?[0-9]*))?$/i;
 
 /**
  * Clean up common OCR artifacts on musical chord symbols, handling common misreadings
@@ -43,8 +43,9 @@ export function normalizeChordToken(raw: string): string[] {
   if (!t) return [];
 
   // Remove surrounding brackets, quotes, braces, colons, semicolons, pipe bars
-  t = t.replace(/^[|!\[\]\(\)\{\}<>'"`~.,:;~*_\-]+/, '');
-  t = t.replace(/[|!\[\]\(\)\{\}<>'"`~.,:;~*_\-]+$/, '');
+  // Do NOT strip trailing ! or | here, as they are used for chord OCR normalization (e.g. Cm! -> Cm7)
+  t = t.replace(/^[\[\]\(\)\{\}<>'"`~.,:;~*_\-]+/, '');
+  t = t.replace(/[\[\]\(\)\{\}<>'"`~.,:;~*_\-]+$/, '');
   if (!t) return [];
 
   // Strip section headers and musical direction markings
@@ -66,21 +67,40 @@ export function normalizeChordToken(raw: string): string[] {
   // Normalize slash chord separators (e.g. C/E, C|E, C\E, C1E, CIE, C!E)
   t = t.replace(/([A-G][#b]?)[|I1\\!]([A-G][#b]?)/gi, '$1/$2');
 
-  // Superscript 7 / quote / question mark: Cm’ -> Cm7, Gm? -> Gm7
-  t = t.replace(/([A-G][#b]?(?:m|min|maj)?)['’´]/g, '$17');
-  t = t.replace(/([A-G][#b]?(?:m|min|maj)?)\?/g, '$17');
+  // Superscript 7 / quote / question mark / registered trademark: Cm’ -> Cm7, Gm? -> Gm7, Fm® -> Fm7, Cm" -> Cm7
+  t = t.replace(/([A-G][#b]?(?:m|min|maj)?)['’´"®\u201C\u201D\u2018\u2019]/gi, '$17');
+  t = t.replace(/([A-G][#b]?(?:m|min|maj)?)\?/gi, '$17');
 
-  // Common OCR letter-confusion on musical qualities (e.g. "An" -> "Am", "Dn" -> "Dm")
+  // Common OCR letter-confusion on musical qualities (e.g. "An" -> "Am", "Dn" -> "Dm", "Dmi" -> "Dm")
   t = t.replace(/\b([A-G][#b]?)n\b/gi, '$1m');
+  t = t.replace(/\b([A-G][#b]?)mi\b/gi, '$1m');
 
   // Normalize sus chord OCR typos like susé4 -> sus4
   t = t.replace(/sus[é0-9]*4/gi, 'sus4');
 
   // Common OCR typos for 11 or 7 in extended chords (e.g. Cml! -> Cm11, Fm!! -> Fm11, Cm! -> Cm7)
   t = t.replace(/([A-G][#b]?m)l!/gi, (_, g1) => g1 + '11');
+  t = t.replace(/([A-G][#b]?m)i!!/gi, (_, g1) => g1 + '11');
+  t = t.replace(/([A-G][#b]?m)i!/gi, (_, g1) => g1 + '11');
   t = t.replace(/([A-G][#b]?m)!!/gi, (_, g1) => g1 + '11');
   t = t.replace(/([A-G][#b]?m)!/gi, (_, g1) => g1 + '7');
+  t = t.replace(/([A-G][#b]?m)"/gi, (_, g1) => g1 + '7');
+  t = t.replace(/([A-G][#b]?m)"/gi, (_, g1) => g1 + '7');
+  t = t.replace(/([A-G][#b]?m)'/gi, (_, g1) => g1 + '7');
+  t = t.replace(/([A-G][#b]?m)'/gi, (_, g1) => g1 + '7');
+  t = t.replace(/([A-G][#b]?m)´/gi, (_, g1) => g1 + '7');
+  t = t.replace(/([A-G][#b]?m)\?/gi, (_, g1) => g1 + '7');
   t = t.replace(/oma7/gi, 'maj7');
+
+  // Fix incomplete quality strings (e.g. Cc -> C, E77 -> E7, Fe7 -> F7, B> -> Bb, BP -> Bb, Bmaz -> Bmaj)
+  t = t.replace(/\b([A-G][#b]?)c\b/gi, '$1');
+  t = t.replace(/\b([A-G][#b]?)77\b/gi, '$17');
+  t = t.replace(/\b([A-G][#b]?)e7\b/gi, '$17');
+  t = t.replace(/\b([A-G])>/gi, '$1b');
+  t = t.replace(/\b([A-G])P\b/gi, '$1b');
+  t = t.replace(/\b([A-G][#b]?)maz\b/gi, '$1maj');
+  t = t.replace(/\b([A-G][#b]?)9ma7\b/gi, '$1maj9');
+  t = t.replace(/\b([A-G][#b]?)9maj7\b/gi, '$1maj9');
 
   // Normalize delimiters between concatenated chords (e.g. "F(G/F" -> "F G/F", "(F]6G" -> "F G", "F]G" -> "F/G")
   t = t.replace(/([A-G][#b]?)[\(\[\{]([A-G][#b]?)/gi, '$1 $2');
@@ -456,14 +476,41 @@ export async function scanSheetForChords(
     const { target: recognizeTarget, width: ocrWidth, height: ocrHeight } =
       getOptimizedOcrTarget(img, imageSource);
 
-    const ret = await worker.recognize(recognizeTarget);
+    // 1. Scan with PSM 6 (Assume a single uniform block of text) for standard staves
+    await worker.setParameters({
+      tessedit_pageseg_mode: "6" as any,
+    });
+    const ret6 = await worker.recognize(recognizeTarget);
+
+    // 2. Scan with PSM 11 (Sparse text) for sparse or complex layouts
+    await worker.setParameters({
+      tessedit_pageseg_mode: "11" as any,
+    });
+    const ret11 = await worker.recognize(recognizeTarget);
+
     await worker.terminate();
 
     onProgress?.({ status: 'Filtering & aligning chord positions along staves...', progress: 0.95 });
 
     const candidateTokens: CandidateToken[] = [];
-    if (ret.data && ret.data.words) {
-      ret.data.words.forEach((w) => {
+    
+    // Add words from PSM 6
+    if (ret6.data && ret6.data.words) {
+      ret6.data.words.forEach((w) => {
+        candidateTokens.push({
+          text: w.text,
+          x0: w.bbox.x0,
+          y0: w.bbox.y0,
+          x1: w.bbox.x1,
+          y1: w.bbox.y1,
+          confidence: w.confidence,
+        });
+      });
+    }
+
+    // Add words from PSM 11
+    if (ret11.data && ret11.data.words) {
+      ret11.data.words.forEach((w) => {
         candidateTokens.push({
           text: w.text,
           x0: w.bbox.x0,
@@ -478,12 +525,12 @@ export async function scanSheetForChords(
     // In Node.js or when width/height aren't supplied, derive natural bounds from OCR bboxes
     let derivedWidth = ocrWidth;
     let derivedHeight = ocrHeight;
-    if (ret.data && ret.data.words && ret.data.words.length > 0) {
+    if (candidateTokens.length > 0) {
       let maxBx = 0;
       let maxBy = 0;
-      ret.data.words.forEach((w) => {
-        if (w.bbox.x1 > maxBx) maxBx = w.bbox.x1;
-        if (w.bbox.y1 > maxBy) maxBy = w.bbox.y1;
+      candidateTokens.forEach((w) => {
+        if (w.x1 > maxBx) maxBx = w.x1;
+        if (w.y1 > maxBy) maxBy = w.y1;
       });
       // If words span beyond default assumptions, adapt width/height accordingly
       if (maxBx > derivedWidth) derivedWidth = Math.ceil(maxBx * 1.05);

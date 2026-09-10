@@ -94,9 +94,9 @@ export function normalizeAccidentals(str: string): string {
 /**
  * Regex to parse a chord into Root, Quality, and optional Bass (/Note)
  * Matches e.g.:
- * C, C#, Db, F#m, Bbm7, Gsus4, Dmaj7, F#m7b5, C7#9, Bb/D, G/B, etc.
+ * C, C#, Db, F#m, Bbm7, Gsus4, Dmaj7, F#m7b5, C7#9, Bb/D, G/B, G/D7, etc.
  */
-const CHORD_REGEX = /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/i;
+const CHORD_REGEX = /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?[0-9]*))?$/i;
 
 /**
  * Parses a chord string into its constituent parts
@@ -121,6 +121,10 @@ export function parseChord(chordStr: string): ParsedChord {
 
   if (bass) {
     bass = bass.charAt(0).toUpperCase() + (bass.slice(1).toLowerCase());
+    // If bass has a numeric extension (e.g., D7 in G/D7), extract just the note for transposition
+    if (/^[A-G][#b]?[0-9]+$/i.test(bass)) {
+      bass = bass.slice(0, bass.search(/[0-9]/i));
+    }
   }
 
   // Capitalize quality if it was lowercase single letter root that got lumped, or normalize
