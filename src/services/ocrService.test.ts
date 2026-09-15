@@ -76,4 +76,28 @@ describe('Music Sheet Staff-Aware Detection', () => {
       expect(ids.size).toBe(chords.length);
     }
   });
+
+  it('attempts free Vision AI even without a client API key, then uses the result', async () => {
+    const { scanSheetWithFallback } = await import('./ocrService');
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          chords: [
+            { chord: 'Am', xPercent: 22, yPercent: 31, widthPercent: 5, heightPercent: 3 },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )) as typeof fetch;
+
+    try {
+      const chords = await scanSheetWithFallback('data:image/png;base64,abc', {
+        provider: 'openrouter',
+      });
+      expect(chords.length).toBe(1);
+      expect(chords[0].originalText).toBe('Am');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

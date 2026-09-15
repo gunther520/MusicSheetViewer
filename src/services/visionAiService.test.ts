@@ -62,4 +62,11 @@ describe('Vision AI Service', () => {
     expect(parsed.length).toBe(2);
     expect(parsed.map(p => p.originalText)).toEqual(['C', 'Am']);
   });
+
+  it('extracts JSON when a free model wraps it in extra text', () => {
+    const noisy = 'Here you go:\n{"chords":[{"chord":"C7","xPercent":40,"yPercent":38}]}\nThanks';
+    const parsed = parseVisionChordsResponse(noisy);
+    expect(parsed.length).toBe(1);
+    expect(parsed[0].originalText).toBe('C7');
+  });
 });

@@ -1,7 +1,14 @@
 import { ChordPosition, isValidChord, normalizeChordToken } from './ocrService';
+import { completeOpenRouterVision, OPENROUTER_FREE_MODEL } from './openRouterClient';
+import { alignChordsToStaffTracks, detectStaffTracksFromDataUrl, snapChordsToStaffTracks } from './staffGeometry';
+import { VISION_DETECTION_SYSTEM_PROMPT } from './visionPrompt';
+
+export { VISION_DETECTION_SYSTEM_PROMPT };
+
+export type VisionProvider = 'openrouter' | 'openai' | 'gemini' | 'anthropic';
 
 export interface VisionAiOptions {
-  provider?: 'openai' | 'gemini' | 'anthropic';
+  provider?: VisionProvider;
   apiKey?: string;
   apiEndpoint?: string;
 }
@@ -15,33 +22,6 @@ export interface DetectedVisionChord {
   confidence?: number;
 }
 
-export const VISION_DETECTION_SYSTEM_PROMPT = `You are an expert music notation and sheet music analysis AI.
-Your task is to detect ALL musical chords printed above the staves on this sheet music image.
-
-Instructions:
-1. Examine each musical staff from top to bottom, left to right.
-2. Identify all chord symbols written ABOVE the staff lines (such as C, G, Am, F, C/E, D/F#, Bb, Bb/C, Gsus4, Dm7, etc.).
-3. Distinguish chords from lyrics, section headers (Intro, Verse, Chorus, Bridge, Fine, etc.), tempo markings, rehearsal numbers, solfege, and note heads.
-4. For every chord detected:
-   - "chord": Clean, normalized chord symbol (e.g. "C", "Am", "C/E", "D/F#", "Bb", "Bb/C", "Gsus4").
-   - "xPercent": Horizontal position of the chord center as a percentage (0.0 to 100.0) across the image width.
-   - "yPercent": Vertical baseline position of the chord as a percentage (0.0 to 100.0) down the image height.
-   - "widthPercent": Approximate width of the chord symbol text box as percentage (e.g. 3.0 to 8.0).
-   - "heightPercent": Approximate height of the chord symbol text box as percentage (e.g. 2.0 to 4.0).
-5. Output STRICT JSON only conforming to the schema:
-{
-  "chords": [
-    {
-      "chord": "string",
-      "xPercent": number,
-      "yPercent": number,
-      "widthPercent": number,
-      "heightPercent": number
-    }
-  ]
-}
-Do NOT include markdown fences, explanations, or any extra text. Return ONLY the JSON object.`;
-
 /**
  * Validates and converts raw vision AI chord entries into standard ChordPosition objects
  */
@@ -52,7 +32,12 @@ export function parseVisionChordsResponse(
   if (typeof rawJson === 'string') {
     try {
       const cleanJson = rawJson.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-      parsed = JSON.parse(cleanJson);
+      const firstBrace = cleanJson.indexOf('{');
+      const lastBrace = cleanJson.lastIndexOf('}');
+      const jsonSlice = firstBrace >= 0 && lastBrace > firstBrace
+        ? cleanJson.slice(firstBrace, lastBrace + 1)
+        : cleanJson;
+      parsed = JSON.parse(jsonSlice);
     } catch (e) {
       console.error('Failed to parse Vision AI JSON output:', e);
       return [];
@@ -92,6 +77,80 @@ export function parseVisionChordsResponse(
   });
 
   return validChords;
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function downscaleDataUrl(dataUrl: string, maxDim = 1600): Promise<string> {
+  if (typeof document === 'undefined' || typeof Image === 'undefined') {
+    return Promise.resolve(dataUrl);
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const width = img.naturalWidth || img.width;
+      const height = img.naturalHeight || img.height;
+      const longest = Math.max(width, height);
+      if (!longest || longest <= maxDim) {
+        resolve(dataUrl);
+        return;
+      }
+      const scale = maxDim / longest;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+export async function prepareSheetImageForVision(source: string, maxDim = 1600): Promise<string> {
+  let dataUrl = source;
+  if (!source.startsWith('data:')) {
+    try {
+      const response = await fetch(source);
+      if (response.ok) {
+        const blob = await response.blob();
+        if (typeof FileReader !== 'undefined') {
+          dataUrl = await blobToDataUrl(blob);
+        }
+      }
+    } catch {
+      return source;
+    }
+  }
+  return downscaleDataUrl(dataUrl, maxDim);
+}
+
+export async function detectChordsWithOpenRouter(
+  imageBase64OrUrl: string,
+  apiKey: string
+): Promise<ChordPosition[]> {
+  const { raw } = await completeOpenRouterVision({
+    image: imageBase64OrUrl,
+    apiKey,
+    systemPrompt: VISION_DETECTION_SYSTEM_PROMPT,
+    preferredModel: OPENROUTER_FREE_MODEL,
+  });
+  return parseVisionChordsResponse(raw);
 }
 
 /**
@@ -206,46 +265,61 @@ export async function detectChordsWithGemini(
   return parseVisionChordsResponse(content);
 }
 
+async function alignDetectedChords(imageDataUrl: string, chords: ChordPosition[]): Promise<ChordPosition[]> {
+  if (chords.length === 0) return chords;
+  try {
+    const staffTracks = await detectStaffTracksFromDataUrl(imageDataUrl);
+    return snapChordsToStaffTracks(chords, staffTracks);
+  } catch {
+    return alignChordsToStaffTracks(chords);
+  }
+}
+
 /**
  * Main Vision AI coordinator function
- * Tries serverless proxy endpoint /api/detect-chords if available,
- * or direct provider client call if user provided API key,
- * or returns null so caller falls back to local high-precision engine.
+ * Tries serverless/local proxy `/api/detect-chords` first (server holds OPENROUTER_API_KEY),
+ * then a direct free OpenRouter call if the user pasted a key,
+ * then optional OpenAI/Gemini if those providers were chosen explicitly.
  */
 export async function scanSheetWithVisionAI(
   imageDataUrl: string,
   options?: VisionAiOptions
 ): Promise<ChordPosition[]> {
-  // 1. If custom API endpoint is provided or default /api/detect-chords exists
+  const prepared = await prepareSheetImageForVision(imageDataUrl);
+  const provider = options?.provider || 'openrouter';
   const endpoint = options?.apiEndpoint || '/api/detect-chords';
+
   try {
     const proxyResponse = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        image: imageDataUrl,
-        provider: options?.provider || 'openai',
-        apiKey: options?.apiKey,
+        image: prepared,
+        provider,
       }),
     });
 
     if (proxyResponse.ok) {
       const result = await proxyResponse.json();
-      if (Array.isArray(result.chords) && result.chords.length > 0) {
-        return parseVisionChordsResponse(result);
+      const parsed = parseVisionChordsResponse(result);
+      if (parsed.length > 0) {
+        return alignDetectedChords(prepared, parsed);
       }
     }
   } catch {
     // Serverless proxy not deployed or unreachable in purely static mode
   }
 
-  // 2. Direct client-side API call if user entered API key
   if (options?.apiKey) {
-    if (options.provider === 'gemini') {
-      return await detectChordsWithGemini(imageDataUrl, options.apiKey);
+    let detected: ChordPosition[] = [];
+    if (provider === 'gemini') {
+      detected = await detectChordsWithGemini(prepared, options.apiKey);
+    } else if (provider === 'openai') {
+      detected = await detectChordsWithOpenAI(prepared, options.apiKey);
+    } else {
+      detected = await detectChordsWithOpenRouter(prepared, options.apiKey);
     }
-    // Default to OpenAI
-    return await detectChordsWithOpenAI(imageDataUrl, options.apiKey);
+    return alignDetectedChords(prepared, detected);
   }
 
   throw new Error('No Vision AI key or serverless endpoint configured');

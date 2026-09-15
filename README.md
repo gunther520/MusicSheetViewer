@@ -36,8 +36,10 @@ An interactive sheet music application that allows musicians to photograph or up
 - **Individual Chord Play**: Click the speaker icon on any chord badge or sidebar item to hear its voicing.
 - **Full Progression Playback**: "Play All Chords Preview" button plays through the entire piece's chords in sequence.
 
-### 5. Automatic OCR Detection
-- **Tesseract.js Integration**: Scans uploaded photos/images directly in the browser.
+### 5. Automatic Chord Detection
+- **Hybrid scan**: Free OpenRouter Vision AI first (`openrouter/free`), then Tesseract OCR if Vision is unavailable.
+- **Staff-aware placement**: Detected chords are snapped onto shared staff chord tracks.
+- **Tesseract.js fallback**: Local in-browser OCR when no Vision key/endpoint is configured.
 - **Chord Token Filter**: Cleans noise, filters out lyrics, and extracts chord positions.
 
 ### 6. Export & Print
@@ -62,6 +64,18 @@ npm install
 npm run dev
 ```
 Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+### Free Vision AI (OpenRouter)
+
+Chord scanning uses OpenRouter's **free models router** (`openrouter/free`) and never calls paid model slugs.
+
+1. Copy `.env.example` to `.env.local` (gitignored) and set:
+   ```bash
+   OPENROUTER_API_KEY=sk-or-v1-...
+   ```
+   Do **not** prefix this with `VITE_`. Vite would embed it in the browser bundle.
+2. On Vercel, add the same `OPENROUTER_API_KEY` project environment variable for Production.
+3. `npm run dev` proxies `/api/detect-chords` with that server key. If Vision fails, the app falls back to local OCR.
 
 ### Run Tests
 ```bash
@@ -123,6 +137,8 @@ Once linked, **every commit and push to `main` will automatically build and depl
 The codebase includes comprehensive unit and integration tests:
 - `tests/four-sheets-evaluation.test.ts`: Automated ground-truth evaluation across all sheets in `testing/`.
 - `src/services/visionAiService.test.ts`: Multimodal Vision AI JSON parsing, validation, and schema tests.
+- `src/services/openRouterClient.test.ts`: Free-model router guards (`openrouter/free` / `:free` only).
+- `src/services/staffGeometry.test.ts`: Staff-track clustering and chord overlay snapping.
 - `src/utils/chordUtils.test.ts`: Chord parsing, root/quality/bass extraction, transposition calculations (including 1 key lower, wrapping, accidentals).
 - `src/data/sampleSheets.test.ts`: Sample sheet coordinate validation and progression transposition verification.
 - `src/services/ocrService.test.ts`: OCR token sanitization, symbol filtering, and bounding box normalization.

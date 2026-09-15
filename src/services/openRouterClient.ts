@@ -1,0 +1,158 @@
+/**
+ * OpenRouter client for free-tier Vision chord detection.
+ * Uses only the free models router (`openrouter/free`) plus `:free` fallbacks.
+ * Never import paid model slugs here.
+ */
+
+export const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+/** Free Models Router: picks a free model that supports the requested features (images, etc.). */
+export const OPENROUTER_FREE_MODEL = 'openrouter/free';
+
+/** Explicit free vision fallbacks if the router is unavailable. All slugs must stay `:free`. */
+export const OPENROUTER_FREE_FALLBACK_MODELS = [
+  'inclusionai/ling-3.0-flash-vl:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'google/gemma-4-31b-it:free',
+] as const;
+
+export const OPENROUTER_FREE_MODEL_CANDIDATES = [
+  OPENROUTER_FREE_MODEL,
+  ...OPENROUTER_FREE_FALLBACK_MODELS,
+] as const;
+
+export function isFreeOpenRouterModel(model: string): boolean {
+  const trimmed = model.trim();
+  return trimmed === OPENROUTER_FREE_MODEL || trimmed.endsWith(':free');
+}
+
+export function assertFreeOpenRouterModel(model: string): string {
+  if (!isFreeOpenRouterModel(model)) {
+    throw new Error(`Refusing paid OpenRouter model "${model}". Only openrouter/free and :free models are allowed.`);
+  }
+  return model;
+}
+
+export function buildOpenRouterHeaders(apiKey: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+    'HTTP-Referer': 'https://github.com/gunther520/MusicSheetViewer',
+    'X-Title': 'SheetTransposer',
+  };
+}
+
+export function toOpenRouterImageUrl(image: string): string {
+  if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('data:')) {
+    return image;
+  }
+  return `data:image/jpeg;base64,${image}`;
+}
+
+export function buildOpenRouterVisionBody(
+  imageUrl: string,
+  systemPrompt: string,
+  model: string,
+  userText = 'Detect all musical chord symbols printed above the staves on this sheet.'
+): Record<string, unknown> {
+  assertFreeOpenRouterModel(model);
+  return {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: userText },
+          { type: 'image_url', image_url: { url: imageUrl } },
+        ],
+      },
+    ],
+    temperature: 0.1,
+    max_tokens: 4000,
+  };
+}
+
+export function extractOpenRouterMessageContent(data: unknown): string {
+  const root = data as {
+    choices?: Array<{
+      message?: {
+        content?: unknown;
+        reasoning?: unknown;
+        reasoning_content?: unknown;
+      };
+    }>;
+  };
+  const message = root?.choices?.[0]?.message || {};
+  const content = message.content;
+
+  if (typeof content === 'string' && content.trim()) {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    const joined = content
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (part && typeof part === 'object' && 'text' in part) {
+          return String((part as { text?: unknown }).text || '');
+        }
+        return '';
+      })
+      .join('\n')
+      .trim();
+    if (joined) return joined;
+  }
+
+  for (const extra of [message.reasoning, message.reasoning_content]) {
+    if (typeof extra === 'string' && extra.trim()) return extra;
+  }
+
+  return '';
+}
+
+export async function completeOpenRouterVision(options: {
+  image: string;
+  apiKey: string;
+  systemPrompt: string;
+  preferredModel?: string;
+}): Promise<{ raw: string; model: string }> {
+  const imageUrl = toOpenRouterImageUrl(options.image);
+  const preferred = options.preferredModel
+    ? assertFreeOpenRouterModel(options.preferredModel)
+    : OPENROUTER_FREE_MODEL;
+
+  const models = [
+    preferred,
+    ...OPENROUTER_FREE_MODEL_CANDIDATES.filter((model) => model !== preferred),
+  ];
+
+  let lastError = 'OpenRouter free-model request failed';
+
+  for (const model of models) {
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: buildOpenRouterHeaders(options.apiKey),
+      body: JSON.stringify(buildOpenRouterVisionBody(imageUrl, options.systemPrompt, model)),
+    });
+
+    if (!response.ok) {
+      lastError = await response.text();
+      if ([400, 402, 404, 408, 429, 502, 503].includes(response.status)) {
+        continue;
+      }
+      throw new Error(`OpenRouter error (${response.status}): ${lastError}`);
+    }
+
+    const data = await response.json();
+    const raw = extractOpenRouterMessageContent(data);
+    if (raw.trim()) {
+      const usedModel = typeof data?.model === 'string' && data.model
+        ? data.model
+        : model;
+      return { raw, model: usedModel };
+    }
+  }
+
+  throw new Error(lastError);
+}

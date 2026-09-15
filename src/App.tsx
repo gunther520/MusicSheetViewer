@@ -41,7 +41,9 @@ export const App: React.FC = () => {
 
   // Vision AI Settings state (stored in localStorage)
   const [visionApiKey, setVisionApiKey] = useState<string>(() => localStorage.getItem('vision_api_key') || '');
-  const [visionProvider, setVisionProvider] = useState<'openai' | 'gemini'>('openai');
+  const [visionProvider, setVisionProvider] = useState<'openrouter' | 'openai' | 'gemini'>(
+    () => (localStorage.getItem('vision_provider') as 'openrouter' | 'openai' | 'gemini') || 'openrouter'
+  );
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -75,7 +77,7 @@ export const App: React.FC = () => {
     if (!sheetImage || isScanning) return;
     setIsScanning(true);
     setScanProgress(0);
-    setScanStatus(visionApiKey ? 'Starting Vision AI chord scan...' : 'Initializing OCR engine...');
+    setScanStatus('Starting free Vision AI chord scan...');
 
     try {
       const detected = await scanSheetWithFallback(
@@ -293,7 +295,10 @@ export const App: React.FC = () => {
               localStorage.setItem('vision_api_key', key);
             }}
             visionProvider={visionProvider}
-            onVisionProviderChange={setVisionProvider}
+            onVisionProviderChange={(provider) => {
+              setVisionProvider(provider);
+              localStorage.setItem('vision_provider', provider);
+            }}
             onImportChordsClick={() => setIsImportOpen(true)}
           />
 

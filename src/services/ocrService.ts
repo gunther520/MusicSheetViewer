@@ -560,7 +560,7 @@ export async function scanSheetWithFallback(
   imageSource: string | HTMLImageElement,
   visionOptions?: {
     apiKey?: string;
-    provider?: 'openai' | 'gemini' | 'anthropic';
+    provider?: 'openrouter' | 'openai' | 'gemini' | 'anthropic';
     apiEndpoint?: string;
   },
   onProgress?: (progress: ScanProgress) => void
@@ -569,19 +569,21 @@ export async function scanSheetWithFallback(
     ? imageSource
     : (imageSource as HTMLImageElement).src;
 
-  // 1. Try Vision AI if configured with an API key
-  if (visionOptions?.apiKey) {
-    try {
-      onProgress?.({ status: 'Scanning with Vision AI...', progress: 0.2 });
-      const { scanSheetWithVisionAI } = await import('./visionAiService');
-      const visionChords = await scanSheetWithVisionAI(imageUrl, visionOptions);
-      if (visionChords && visionChords.length > 0) {
-        onProgress?.({ status: 'Vision AI scan completed!', progress: 1 });
-        return visionChords;
-      }
-    } catch (visionErr) {
-      console.warn('Vision AI scan failed or unavailable, falling back to local OCR:', visionErr);
+  // 1. Always try free Vision AI first (server OPENROUTER_API_KEY or optional client key)
+  try {
+    onProgress?.({ status: 'Scanning with free Vision AI (OpenRouter)...', progress: 0.2 });
+    const { scanSheetWithVisionAI } = await import('./visionAiService');
+    const visionChords = await scanSheetWithVisionAI(imageUrl, {
+      apiKey: visionOptions?.apiKey,
+      provider: visionOptions?.provider || 'openrouter',
+      apiEndpoint: visionOptions?.apiEndpoint,
+    });
+    if (visionChords && visionChords.length > 0) {
+      onProgress?.({ status: 'Vision AI scan completed!', progress: 1 });
+      return visionChords;
     }
+  } catch (visionErr) {
+    console.warn('Vision AI scan failed or unavailable, falling back to local OCR:', visionErr);
   }
 
   // 2. Fallback to local OCR
