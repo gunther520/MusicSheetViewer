@@ -3,6 +3,7 @@ import {
   assertFreeOpenRouterModel,
   buildOpenRouterVisionBody,
   extractOpenRouterMessageContent,
+  hasNonEmptyChordsPayload,
   isFreeOpenRouterModel,
   OPENROUTER_FREE_MODEL,
   OPENROUTER_FREE_MODEL_CANDIDATES,
@@ -49,5 +50,11 @@ describe('OpenRouter free-model client', () => {
     expect(extractOpenRouterMessageContent({
       choices: [{ message: { content: '', reasoning: '{"chords":[{"chord":"Am"}]}' } }],
     })).toContain('Am');
+  });
+
+  it('accepts only payloads that actually contain chord JSON', () => {
+    expect(hasNonEmptyChordsPayload('{"chords":[{"chord":"C"}]}')).toBe(true);
+    expect(hasNonEmptyChordsPayload('{"chords":[]}')).toBe(false);
+    expect(hasNonEmptyChordsPayload('safe')).toBe(false);
   });
 });

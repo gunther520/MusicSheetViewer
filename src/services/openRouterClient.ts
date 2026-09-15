@@ -111,6 +111,33 @@ export function extractOpenRouterMessageContent(data: unknown): string {
   return '';
 }
 
+export function hasNonEmptyChordsPayload(raw: string): boolean {
+  if (!raw || !raw.trim()) return false;
+  const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  const jsonSlice = firstBrace >= 0 && lastBrace > firstBrace
+    ? cleaned.slice(firstBrace, lastBrace + 1)
+    : cleaned;
+  try {
+    const parsed = JSON.parse(jsonSlice);
+    const list = Array.isArray(parsed?.chords)
+      ? parsed.chords
+      : Array.isArray(parsed)
+        ? parsed
+        : [];
+    return list.some((item: unknown) => {
+      if (typeof item === 'string') return item.trim().length > 0;
+      if (item && typeof item === 'object' && 'chord' in item) {
+        return String((item as { chord?: unknown }).chord || '').trim().length > 0;
+      }
+      return false;
+    });
+  } catch {
+    return false;
+  }
+}
+
 export async function completeOpenRouterVision(options: {
   image: string;
   apiKey: string;
@@ -146,12 +173,13 @@ export async function completeOpenRouterVision(options: {
 
     const data = await response.json();
     const raw = extractOpenRouterMessageContent(data);
-    if (raw.trim()) {
+    if (hasNonEmptyChordsPayload(raw)) {
       const usedModel = typeof data?.model === 'string' && data.model
         ? data.model
         : model;
       return { raw, model: usedModel };
     }
+    lastError = `Free model ${model} returned no chord JSON`;
   }
 
   throw new Error(lastError);

@@ -55,8 +55,9 @@ export function parseVisionChordsResponse(
 
   rawList.forEach((item) => {
     if (!item || typeof item.chord !== 'string') return;
-    const cleanNames = normalizeChordToken(item.chord);
-    const chordName = cleanNames[0] || item.chord.trim();
+    const rewritten = item.chord.replace(/[△∆]/g, 'maj');
+    const cleanNames = normalizeChordToken(rewritten);
+    const chordName = cleanNames[0] || rewritten.trim();
     if (!chordName || !isValidChord(chordName)) return;
 
     const x = Math.max(0, Math.min(98, Number(item.xPercent) || 0));

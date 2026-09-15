@@ -69,4 +69,12 @@ describe('Vision AI Service', () => {
     expect(parsed.length).toBe(1);
     expect(parsed[0].originalText).toBe('C7');
   });
+
+  it('normalizes jazz triangle major-seventh notation', () => {
+    const parsed = parseVisionChordsResponse({
+      chords: [{ chord: 'C△7', xPercent: 10, yPercent: 20 }],
+    });
+    expect(parsed.length).toBe(1);
+    expect(parsed[0].originalText).toBe('Cmaj7');
+  });
 });
