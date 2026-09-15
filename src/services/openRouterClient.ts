@@ -65,7 +65,7 @@ export function buildOpenRouterVisionBody(
         role: 'user',
         content: [
           { type: 'text', text: userText },
-          { type: 'image_url', image_url: { url: imageUrl } },
+          { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
         ],
       },
     ],

@@ -7,10 +7,12 @@ import { VISION_BAND_MONTAGE_SYSTEM_PROMPT, resolveVisionPrompts } from './visio
 
 describe('Vision AI Service', () => {
   it('has a comprehensive prompt enforcing clean music chord extraction', () => {
-    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('lead-sheet reader');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('lead sheets');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('LEFT of slash');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('C/E');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('maj7');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('xPercent');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('yPercent');
-    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('chords');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('{"chords":[]}');
   });
 
@@ -18,6 +20,7 @@ describe('Vision AI Service', () => {
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('VERTICAL STACK');
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('{"chords":[]}');
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('"strip"');
+    expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('C/E');
     expect(resolveVisionPrompts('staff-bands').system).toBe(VISION_BAND_MONTAGE_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet').system).toBe(VISION_DETECTION_SYSTEM_PROMPT);
   });

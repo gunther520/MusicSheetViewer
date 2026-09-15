@@ -20,20 +20,38 @@ const FREE_MODELS = [
   'openrouter/free',
 ] as const;
 
-const FULL_SHEET_PROMPT = `You are an expert engraver-level lead-sheet reader.
-Transcribe every printed chord symbol you can actually see. Never invent, never complete a progression, never copy chords from a title/header.
-Return ONLY JSON: {"chords":[{"chord":"string","xPercent":number,"yPercent":number,"widthPercent":number,"heightPercent":number}]}
-If there are no printed chord symbols, return {"chords":[]}.`;
+const FULL_SHEET_PROMPT = `You are an expert engraver-level reader of printed lead sheets and chord charts.
+Transcribe chord SYMBOLS actually printed in THIS image. Do not invent or complete a progression.
+
+HOW TO READ: Root A-G, optional #/b, optional quality, optional /bass.
+Slash: LEFT = chord, RIGHT = bass. C/E, D/F#, Bb/C, G/F, G/B, Gm7/C. Never drop or swap the slash.
+Jazz: △/∆/Δ = maj7 (write Cmaj7). ø = m7b5. Superscript 11 is 11 not 7. Eb is not Bb. Ab is not Db.
+Include EVERY occurrence. Repeated C C C is three objects. Simple C F G Am still count.
+
+EXCLUDE lyrics, titles like "C Major", verse/chorus/intro, bar numbers, SATB, noteheads, N.C., lone | or /.
+
+xPercent/yPercent = glyph CENTER on THIS image (chords sit just above the staff). Walk left-to-right, then next staff down.
+Zero printed symbols → {"chords":[]}.
+
+Return ONLY JSON:
+{"chords":[{"chord":"C/E","xPercent":32.0,"yPercent":22.0,"widthPercent":6,"heightPercent":3}]}`;
 
 const BAND_PROMPT = `You are an expert lead-sheet chord reader.
-This image is a VERTICAL STACK of cropped chord-symbol bands. A gray left column numbers strips 1, 2, 3 from TOP to BOTTOM.
-Return ONLY JSON: {"chords":[{"chord":"string","strip":number,"xPercent":number,"yPercent":number,"widthPercent":number,"heightPercent":number}]}
-If a strip has no chord symbols, contribute nothing. If none, return {"chords":[]}.`;
+THIS image is a VERTICAL STACK of chord-symbol bands above each staff. Gray left column numbers strips 1, 2, 3 from TOP to BOTTOM.
+
+Read each strip left-to-right. One object per glyph. strip = left-column number (required).
+Slash: LEFT chord, RIGHT bass (C/E, D/F#, Bb/C). △ = maj7. 11 is not 7. Repeats are separate objects. Include C F G.
+Blank strip → nothing. No symbols at all → {"chords":[]}. Do not invent.
+
+xPercent is 0-100 of the FULL stacked image (including the number gutter).
+
+Return ONLY JSON:
+{"chords":[{"chord":"C/E","strip":1,"xPercent":32.0,"yPercent":12.0,"widthPercent":6,"heightPercent":3}]}`;
 
 const FULL_SHEET_USER =
-  'Detect every printed chord-symbol occurrence on this image. Repeat identical chords as separate objects. If none, return {"chords":[]}.';
+  'Transcribe every printed chord glyph, left-to-right then down the page. Keep slash chords (C/E, D/F#, Bb/C). Repeat identical chords as separate objects. If none, {"chords":[]}.';
 const BAND_USER =
-  'Each numbered strip is one staff chord band. List every printed chord with strip + xPercent. If none, return {"chords":[]}.';
+  'Each numbered strip is one staff chord band. For every glyph: chord + strip + xPercent. Keep slashes and repeats. Blank strips contribute nothing. If none, {"chords":[]}.';
 
 type JsonBody = {
   image?: string;
@@ -116,7 +134,7 @@ async function completeFreeVision(image: string, apiKey: string, layout: string)
             role: 'user',
             content: [
               { type: 'text', text: user },
-              { type: 'image_url', image_url: { url: imageUrl } },
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
             ],
           },
         ],

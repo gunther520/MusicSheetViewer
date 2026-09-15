@@ -41,6 +41,9 @@ describe('OpenRouter free-model client', () => {
     const messages = body.messages as Array<{ role: string; content: unknown }>;
     expect(messages[0].role).toBe('system');
     expect(Array.isArray(messages[1].content)).toBe(true);
+    const userParts = messages[1].content as Array<{ type: string; image_url?: { detail?: string } }>;
+    const imagePart = userParts.find((part) => part.type === 'image_url');
+    expect(imagePart?.image_url?.detail).toBe('high');
   });
 
   it('extracts message content and reasoning fallbacks', () => {
