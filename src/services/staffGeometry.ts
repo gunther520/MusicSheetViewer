@@ -179,7 +179,7 @@ export function detectStaffSystemsFromGray(
     const isGrandPair = Boolean(
       next &&
       gapToNext > staff.spacing * 1.15 &&
-      gapToNext < staffHeight * 2.65
+      gapToNext < staffHeight * 2.4
     );
 
     if (prevSystem && staff.top < prevSystem.staffBottom + staffHeight * 0.4) {
