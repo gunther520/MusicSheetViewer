@@ -67,7 +67,7 @@ export async function buildMontageWithSharp(
   upscale: number,
   gap = 8
 ): Promise<{
-  buffer: Buffer;
+  buffer: Uint8Array;
   width: number;
   height: number;
   slices: Array<{ montageY0: number; montageY1: number; srcY: number; srcH: number }>;
@@ -77,7 +77,7 @@ export async function buildMontageWithSharp(
   const imgH = meta.height || 1;
   const outW = Math.max(8, Math.round(sourceWidth * upscale));
   const mapped: Array<{ montageY0: number; montageY1: number; srcY: number; srcH: number }> = [];
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: Array<{ input: Uint8Array; top: number; left: number }> = [];
   let y = 0;
 
   for (let i = 0; i < slices.length; i++) {

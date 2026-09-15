@@ -151,11 +151,16 @@ export async function prepareSheetImageForVision(source: string, maxDim = 1600):
 export function canAttemptVision(options?: VisionAiOptions): boolean {
   if (options?.apiKey) return true;
   try {
-    if (typeof process !== 'undefined' && process.env?.OPENROUTER_API_KEY) return true;
+    if (readOpenRouterEnvKey()) return true;
   } catch {
     // ignore
   }
   return typeof window !== 'undefined';
+}
+
+function readOpenRouterEnvKey(): string | undefined {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.OPENROUTER_API_KEY;
 }
 
 export async function detectChordsWithOpenRouter(
@@ -301,10 +306,8 @@ async function requestVisionChords(
   layout: VisionSheetLayout,
   options?: VisionAiOptions
 ): Promise<ChordPosition[]> {
-  const prompts = resolveVisionPrompts(layout);
   const provider = options?.provider || 'openrouter';
-  const nodeKey = options?.apiKey
-    || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : undefined);
+  const nodeKey = options?.apiKey || readOpenRouterEnvKey();
 
   if (nodeKey && typeof window === 'undefined' && provider === 'openrouter') {
     return detectChordsWithOpenRouter(image, nodeKey, layout);

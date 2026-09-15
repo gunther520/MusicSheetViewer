@@ -54,7 +54,7 @@ export async function rasterizeSheet(
   maxWidth = 1400
 ): Promise<GrayRaster> {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    const { rasterizeWithSharp } = await import('./rasterizeNode');
+    const { rasterizeWithSharp } = await import(/* @vite-ignore */ './rasterizeNode');
     return rasterizeWithSharp(typeof source === 'string' ? source : source.src, maxWidth);
   }
   return rasterizeWithCanvas(source, maxWidth);
@@ -111,7 +111,7 @@ export async function invertSheetForOcr(
   maxDim = 2000
 ): Promise<BandImage['target']> {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    const { invertSheetWithSharp } = await import('./rasterizeNode');
+    const { invertSheetWithSharp } = await import(/* @vite-ignore */ './rasterizeNode');
     return invertSheetWithSharp(typeof source === 'string' ? source : source.src, maxDim);
   }
   const img = typeof source === 'string' ? await loadDomImage(source) : source;
@@ -150,7 +150,7 @@ export async function cropBandForOcr(
   const height = Math.max(8, Math.round(srcH * upscale));
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    const { cropBandWithSharp } = await import('./rasterizeNode');
+    const { cropBandWithSharp } = await import(/* @vite-ignore */ './rasterizeNode');
     const buffer = await cropBandWithSharp(
       typeof source === 'string' ? source : source.src,
       srcX,
@@ -187,14 +187,17 @@ export async function cropBandForOcr(
   return { target: canvas, width, height, srcX, srcY, upscale };
 }
 
-function bufferToJpegDataUrl(buffer: Uint8Array | Buffer): string {
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+function uint8ToBase64(bytes: Uint8Array): string {
+  const maybeBuffer = (globalThis as { Buffer?: { from: (value: Uint8Array) => { toString: (enc: string) => string } } }).Buffer;
+  if (maybeBuffer) {
+    return maybeBuffer.from(bytes).toString('base64');
+  }
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  return `data:image/jpeg;base64,${btoa(binary)}`;
+  return btoa(binary);
 }
 
 /**
@@ -214,7 +217,7 @@ export async function buildChordBandMontage(
   const gap = 8;
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    const { buildMontageWithSharp } = await import('./rasterizeNode');
+    const { buildMontageWithSharp } = await import(/* @vite-ignore */ './rasterizeNode');
     const built = await buildMontageWithSharp(
       typeof source === 'string' ? source : source.src,
       usable,
@@ -223,11 +226,8 @@ export async function buildChordBandMontage(
       upscale,
       gap
     );
-    const dataUrl = typeof Buffer !== 'undefined'
-      ? `data:image/jpeg;base64,${Buffer.from(built.buffer).toString('base64')}`
-      : bufferToJpegDataUrl(built.buffer);
     return {
-      dataUrl,
+      dataUrl: `data:image/jpeg;base64,${uint8ToBase64(built.buffer)}`,
       width: built.width,
       height: built.height,
       sourceWidth,
@@ -292,7 +292,7 @@ export async function sheetToDataUrl(
   if (source.startsWith('data:') && !invert) return source;
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    const { fileToVisionJpegDataUrl } = await import('./rasterizeNode');
+    const { fileToVisionJpegDataUrl } = await import(/* @vite-ignore */ './rasterizeNode');
     if (source.startsWith('data:')) return source;
     return fileToVisionJpegDataUrl(source, maxDim, invert);
   }
