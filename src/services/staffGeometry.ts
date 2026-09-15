@@ -177,7 +177,9 @@ export function detectStaffSystemsFromGray(
     const staffHeight = staff.bottom - staff.top;
     const gapToNext = next ? next.top - staff.bottom : Infinity;
     const isGrandPair = Boolean(
-      next && gapToNext > staff.spacing * 1.2 && gapToNext < staffHeight * 1.8
+      next &&
+      gapToNext > staff.spacing * 1.15 &&
+      gapToNext < staffHeight * 2.65
     );
 
     if (prevSystem && staff.top < prevSystem.staffBottom + staffHeight * 0.4) {
@@ -218,6 +220,133 @@ function estimateInkThreshold(pixels: Uint8Array): number {
   }
   const mean = count ? sum / count : 128;
   return mean < 90 ? 160 : Math.max(70, Math.min(140, mean - 45));
+}
+
+/**
+ * Score a chord band for sparse, token-sized ink (printed chord symbols)
+ * versus leftover staff lines or dense lyric/notation fill.
+ */
+export function scoreChordBandInk(
+  width: number,
+  height: number,
+  gray: Uint8Array,
+  system: StaffSystem,
+  inkThreshold?: number
+): { peaks: number; fill: number } {
+  const y1 = Math.min(height, Math.ceil(system.chordBandBottom));
+  const yTop = Math.max(0, Math.floor(system.chordBandTop));
+  const y0 = Math.max(yTop, Math.round(yTop + (y1 - yTop) * 0.32));
+  if (y1 - y0 < 4) return { peaks: 0, fill: 0 };
+
+  const x0 = Math.floor(width * 0.07);
+  const x1 = Math.ceil(width * 0.93);
+  const span = Math.max(1, x1 - x0);
+  const threshold = inkThreshold ?? estimateInkThreshold(gray);
+  const col = new Float64Array(span);
+  let dark = 0;
+  let area = 0;
+
+  for (let y = y0; y < y1; y++) {
+    const rowStart = y * width;
+    let longest = 0;
+    let run = 0;
+    for (let x = x0; x < x1; x++) {
+      if (gray[rowStart + x] < threshold) {
+        run += 1;
+        if (run > longest) longest = run;
+      } else {
+        run = 0;
+      }
+    }
+    if (longest / span > 0.5) continue;
+    area += span;
+    for (let x = x0; x < x1; x++) {
+      if (gray[rowStart + x] < threshold) {
+        col[x - x0] += 1;
+        dark += 1;
+      }
+    }
+  }
+
+  const fill = area > 0 ? dark / area : 0;
+  const bandH = Math.max(1, y1 - y0);
+  const minH = Math.max(2, bandH * 0.12);
+  const smoothed = new Float64Array(span);
+  for (let i = 0; i < span; i++) {
+    let sum = 0;
+    let count = 0;
+    for (let k = -2; k <= 2; k++) {
+      const j = i + k;
+      if (j >= 0 && j < span) {
+        sum += col[j];
+        count += 1;
+      }
+    }
+    smoothed[i] = sum / count;
+  }
+
+  let peaks = 0;
+  let i = 0;
+  while (i < span) {
+    if (smoothed[i] >= minH) {
+      let j = i;
+      while (j < span && smoothed[j] >= minH) j += 1;
+      const peakWidth = j - i;
+      if (peakWidth >= 4 && peakWidth <= span * 0.12) peaks += 1;
+      i = j;
+    } else {
+      i += 1;
+    }
+  }
+
+  return { peaks, fill };
+}
+
+export function staffBandHasSymbolInk(
+  width: number,
+  height: number,
+  gray: Uint8Array,
+  system: StaffSystem,
+  inkThreshold?: number
+): boolean {
+  const { peaks, fill } = scoreChordBandInk(width, height, gray, system, inkThreshold);
+  return peaks >= 2 && fill >= 0.013 && fill <= 0.08 && !(fill > 0.03 && peaks >= 10);
+}
+
+export function systemsWithSymbolInk(
+  width: number,
+  height: number,
+  gray: Uint8Array,
+  systems: StaffSystem[]
+): StaffSystem[] {
+  const threshold = estimateInkThreshold(gray);
+  const scored = systems.map((system) => ({
+    system,
+    ...scoreChordBandInk(width, height, gray, system, threshold),
+  }));
+  const pageLooksLikeLead = scored.some((item) => staffBandHasSymbolInk(
+    width,
+    height,
+    gray,
+    item.system,
+    threshold
+  ));
+  if (!pageLooksLikeLead) return [];
+  return scored
+    .filter((item) => item.peaks >= 1 && !(item.fill > 0.03 && item.peaks >= 10))
+    .map((item) => item.system);
+}
+
+export function staffSystemsToKeepYRangesPct(
+  systems: StaffSystem[],
+  rasterHeight: number,
+  padPct = 1.8
+): Array<{ top: number; bottom: number }> {
+  if (rasterHeight <= 0) return [];
+  return systems.map((system) => ({
+    top: Math.max(0, (system.chordBandTop / rasterHeight) * 100 - padPct),
+    bottom: Math.min(100, (system.chordBandBottom / rasterHeight) * 100 + padPct),
+  }));
 }
 
 export function detectStaffChordTracksFromGray(

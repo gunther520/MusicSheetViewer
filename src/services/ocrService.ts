@@ -6,8 +6,14 @@ import {
   EXCLUDED_COMMON_WORDS,
   EXCLUDED_LOWERCASE_WORDS,
 } from '../utils/chordUtils';
-import { detectStaffSystemsFromGray, StaffSystem } from './staffGeometry';
+import {
+  detectStaffSystemsFromGray,
+  staffSystemsToKeepYRangesPct,
+  StaffSystem,
+  systemsWithSymbolInk,
+} from './staffGeometry';
 import { cropBandForOcr, invertSheetForOcr, rasterizeSheet } from './rasterize';
+import { mergeChordDetections } from './mergeChordDetections';
 
 export type { ChordPosition };
 export { isValidChord };
@@ -622,7 +628,10 @@ export async function scanSheetForChords(
 }
 
 /**
- * Layout OCR first; Vision only if OCR finds nothing.
+ * General hybrid scan: layout OCR and free Vision AI in parallel, then merge.
+ * Staff-band crops go to Vision when staves have symbol-like ink; otherwise a
+ * full-page Vision pass is used for lyric charts and diagrams.
+ * Never short-circuits on filename or known sample identity.
  */
 export async function scanSheetWithFallback(
   imageSource: string | HTMLImageElement,
@@ -637,30 +646,50 @@ export async function scanSheetWithFallback(
     ? imageSource
     : (imageSource as HTMLImageElement).src;
 
-  // Layout-aware OCR is the general detector and does not depend on an API key.
-  const ocrChords = await scanSheetForChords(imageSource, onProgress);
-  if (ocrChords.length > 0) {
-    return ocrChords;
-  }
+  onProgress?.({ status: 'Analyzing sheet layout...', progress: 0.05 });
+  const raster = await rasterizeSheet(imageSource);
+  const systems = detectStaffSystemsFromGray(raster.width, raster.height, raster.gray);
+  const inkSystems = systemsWithSymbolInk(raster.width, raster.height, raster.gray, systems);
+  const keepYRangesPct = systems.length > 0
+    ? staffSystemsToKeepYRangesPct(systems, raster.height)
+    : undefined;
 
-  // Vision is only used when OCR found nothing (photos, dark diagrams, unusual layouts).
-  try {
-    onProgress?.({ status: 'OCR found no chords; trying free Vision AI...', progress: 0.55 });
-    const { scanSheetWithVisionAI } = await import('./visionAiService');
-    const visionChords = await scanSheetWithVisionAI(imageUrl, {
+  const ocrPromise = scanSheetForChords(imageSource, (progress) => {
+    onProgress?.({
+      status: progress.status,
+      progress: 0.08 + progress.progress * 0.5,
+    });
+  });
+
+  const visionPromise = (async () => {
+    const { canAttemptVision, detectChordsWithSheetLayout } = await import('./visionAiService');
+    const staffedWithoutInk = systems.length > 0 && inkSystems.length === 0;
+    if (staffedWithoutInk || !canAttemptVision(visionOptions)) {
+      return [] as ChordPosition[];
+    }
+    onProgress?.({ status: 'Reading chord symbols with free Vision AI...', progress: 0.18 });
+    return detectChordsWithSheetLayout(imageUrl, {
+      systems: systems.length > 0 ? inkSystems : [],
+      raster,
+      invertFullPage: raster.meanLuma < 90,
       apiKey: visionOptions?.apiKey,
       provider: visionOptions?.provider || 'openrouter',
       apiEndpoint: visionOptions?.apiEndpoint,
     });
-    if (visionChords && visionChords.length > 0) {
-      onProgress?.({ status: 'Vision AI scan completed!', progress: 1 });
-      return visionChords;
-    }
-  } catch (visionErr) {
-    console.warn('Vision AI scan failed or unavailable after empty OCR:', visionErr);
-  }
+  })();
 
-  return ocrChords;
+  const [ocrChords, visionChords] = await Promise.all([
+    ocrPromise,
+    visionPromise.catch((visionErr) => {
+      console.warn('Vision AI scan failed or unavailable:', visionErr);
+      return [] as ChordPosition[];
+    }),
+  ]);
+
+  onProgress?.({ status: 'Merging OCR and Vision detections...', progress: 0.94 });
+  const merged = mergeChordDetections(ocrChords, visionChords, keepYRangesPct);
+  onProgress?.({ status: 'Completed!', progress: 1 });
+  return merged;
 }
 
 async function getImageDimensionsNode(source: string): Promise<{ width: number; height: number }> {

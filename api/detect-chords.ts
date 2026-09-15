@@ -1,9 +1,10 @@
 import {
   completeOpenRouterVision,
-  OPENROUTER_FREE_MODEL,
+  extractJsonObject,
+  OPENROUTER_PREFERRED_VL_MODEL,
   isFreeOpenRouterModel,
 } from '../src/services/openRouterClient';
-import { VISION_DETECTION_SYSTEM_PROMPT } from '../src/services/visionPrompt';
+import { resolveVisionPrompts, type VisionSheetLayout } from '../src/services/visionPrompt';
 
 interface ApiRequest {
   method?: string;
@@ -12,6 +13,7 @@ interface ApiRequest {
     provider?: string;
     apiKey?: string;
     model?: string;
+    layout?: VisionSheetLayout;
   };
 }
 
@@ -34,7 +36,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { image, provider = 'openrouter', model } = req.body || {};
+  const { image, provider = 'openrouter', model, layout } = req.body || {};
 
   if (!image) {
     return res.status(400).json({ error: 'Missing image parameter' });
@@ -53,23 +55,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   const requestedModel = typeof model === 'string' && isFreeOpenRouterModel(model)
     ? model
-    : OPENROUTER_FREE_MODEL;
+    : OPENROUTER_PREFERRED_VL_MODEL;
+  const visionLayout: VisionSheetLayout = layout === 'staff-bands' ? 'staff-bands' : 'full-sheet';
+  const prompts = resolveVisionPrompts(visionLayout);
 
   try {
     const { raw, model: usedModel } = await completeOpenRouterVision({
       image,
       apiKey: openRouterKey,
-      systemPrompt: VISION_DETECTION_SYSTEM_PROMPT,
+      systemPrompt: prompts.system,
+      userText: prompts.user,
       preferredModel: requestedModel,
     });
 
-    const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-    const firstBrace = cleaned.indexOf('{');
-    const lastBrace = cleaned.lastIndexOf('}');
-    const jsonSlice = firstBrace >= 0 && lastBrace > firstBrace
-      ? cleaned.slice(firstBrace, lastBrace + 1)
-      : cleaned;
-    const parsed = JSON.parse(jsonSlice);
+    const parsed = extractJsonObject(raw) || { chords: [] };
     return res.status(200).json({
       ...parsed,
       model: usedModel,

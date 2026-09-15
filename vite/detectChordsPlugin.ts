@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite';
-import { completeOpenRouterVision } from '../src/services/openRouterClient';
-import { VISION_DETECTION_SYSTEM_PROMPT } from '../src/services/visionPrompt';
+import { completeOpenRouterVision, extractJsonObject } from '../src/services/openRouterClient';
+import { resolveVisionPrompts, type VisionSheetLayout } from '../src/services/visionPrompt';
+import { OPENROUTER_PREFERRED_VL_MODEL } from '../src/services/openRouterClient';
 
 function readJsonBody(req: { on: (event: string, cb: (...args: any[]) => void) => void }): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -59,15 +60,17 @@ export function detectChordsDevPlugin(apiKey: string): Plugin {
         return;
       }
 
+      const layout: VisionSheetLayout = body?.layout === 'staff-bands' ? 'staff-bands' : 'full-sheet';
+      const prompts = resolveVisionPrompts(layout);
       const { raw } = await completeOpenRouterVision({
         image,
         apiKey,
-        systemPrompt: VISION_DETECTION_SYSTEM_PROMPT,
-        preferredModel: 'openrouter/free',
+        systemPrompt: prompts.system,
+        userText: prompts.user,
+        preferredModel: OPENROUTER_PREFERRED_VL_MODEL,
       });
 
-      const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const parsed = extractJsonObject(raw) || { chords: [] };
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(parsed));

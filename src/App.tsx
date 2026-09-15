@@ -77,7 +77,7 @@ export const App: React.FC = () => {
     if (!sheetImage || isScanning) return;
     setIsScanning(true);
     setScanProgress(0);
-    setScanStatus('Scanning chord symbols from the sheet layout...');
+    setScanStatus('Scanning chord symbols with layout OCR and free Vision AI...');
 
     try {
       const detected = await scanSheetWithFallback(

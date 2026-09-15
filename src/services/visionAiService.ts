@@ -1,9 +1,20 @@
 import { ChordPosition, isValidChord, normalizeChordToken } from './ocrService';
-import { completeOpenRouterVision, OPENROUTER_FREE_MODEL } from './openRouterClient';
-import { alignChordsToStaffTracks, detectStaffTracksFromDataUrl, snapChordsToStaffTracks } from './staffGeometry';
-import { VISION_DETECTION_SYSTEM_PROMPT } from './visionPrompt';
+import {
+  completeOpenRouterVision,
+  extractJsonObject,
+  OPENROUTER_PREFERRED_VL_MODEL,
+} from './openRouterClient';
+import { alignChordsToStaffTracks, detectStaffTracksFromDataUrl, snapChordsToStaffTracks, StaffSystem } from './staffGeometry';
+import { buildChordBandMontage, GrayRaster, sheetToDataUrl } from './rasterize';
+import { mapMontageChordsToPage } from './mergeChordDetections';
+import {
+  resolveVisionPrompts,
+  VISION_DETECTION_SYSTEM_PROMPT,
+  type VisionSheetLayout,
+} from './visionPrompt';
 
 export { VISION_DETECTION_SYSTEM_PROMPT };
+export type { VisionSheetLayout };
 
 export type VisionProvider = 'openrouter' | 'openai' | 'gemini' | 'anthropic';
 
@@ -30,16 +41,9 @@ export function parseVisionChordsResponse(
 ): ChordPosition[] {
   let parsed: any = rawJson;
   if (typeof rawJson === 'string') {
-    try {
-      const cleanJson = rawJson.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-      const firstBrace = cleanJson.indexOf('{');
-      const lastBrace = cleanJson.lastIndexOf('}');
-      const jsonSlice = firstBrace >= 0 && lastBrace > firstBrace
-        ? cleanJson.slice(firstBrace, lastBrace + 1)
-        : cleanJson;
-      parsed = JSON.parse(jsonSlice);
-    } catch (e) {
-      console.error('Failed to parse Vision AI JSON output:', e);
+    parsed = extractJsonObject(rawJson);
+    if (!parsed) {
+      console.error('Failed to parse Vision AI JSON output');
       return [];
     }
   }
@@ -127,11 +131,14 @@ export async function prepareSheetImageForVision(source: string, maxDim = 1600):
   let dataUrl = source;
   if (!source.startsWith('data:')) {
     try {
-      const response = await fetch(source);
-      if (response.ok) {
-        const blob = await response.blob();
-        if (typeof FileReader !== 'undefined') {
-          dataUrl = await blobToDataUrl(blob);
+      dataUrl = await sheetToDataUrl(source);
+      if (!dataUrl.startsWith('data:') && !dataUrl.startsWith('blob:')) {
+        const response = await fetch(source);
+        if (response.ok) {
+          const blob = await response.blob();
+          if (typeof FileReader !== 'undefined') {
+            dataUrl = await blobToDataUrl(blob);
+          }
         }
       }
     } catch {
@@ -141,15 +148,28 @@ export async function prepareSheetImageForVision(source: string, maxDim = 1600):
   return downscaleDataUrl(dataUrl, maxDim);
 }
 
+export function canAttemptVision(options?: VisionAiOptions): boolean {
+  if (options?.apiKey) return true;
+  try {
+    if (typeof process !== 'undefined' && process.env?.OPENROUTER_API_KEY) return true;
+  } catch {
+    // ignore
+  }
+  return typeof window !== 'undefined';
+}
+
 export async function detectChordsWithOpenRouter(
   imageBase64OrUrl: string,
-  apiKey: string
+  apiKey: string,
+  layout: VisionSheetLayout = 'full-sheet'
 ): Promise<ChordPosition[]> {
+  const prompts = resolveVisionPrompts(layout);
   const { raw } = await completeOpenRouterVision({
     image: imageBase64OrUrl,
     apiKey,
-    systemPrompt: VISION_DETECTION_SYSTEM_PROMPT,
-    preferredModel: OPENROUTER_FREE_MODEL,
+    systemPrompt: prompts.system,
+    userText: prompts.user,
+    preferredModel: OPENROUTER_PREFERRED_VL_MODEL,
   });
   return parseVisionChordsResponse(raw);
 }
@@ -276,6 +296,110 @@ async function alignDetectedChords(imageDataUrl: string, chords: ChordPosition[]
   }
 }
 
+async function requestVisionChords(
+  image: string,
+  layout: VisionSheetLayout,
+  options?: VisionAiOptions
+): Promise<ChordPosition[]> {
+  const prompts = resolveVisionPrompts(layout);
+  const provider = options?.provider || 'openrouter';
+  const nodeKey = options?.apiKey
+    || (typeof process !== 'undefined' ? process.env?.OPENROUTER_API_KEY : undefined);
+
+  if (nodeKey && typeof window === 'undefined' && provider === 'openrouter') {
+    return detectChordsWithOpenRouter(image, nodeKey, layout);
+  }
+
+  const endpoint = options?.apiEndpoint || '/api/detect-chords';
+  try {
+    const proxyResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image,
+        provider,
+        layout,
+      }),
+    });
+
+    if (proxyResponse.ok) {
+      const result = await proxyResponse.json();
+      return parseVisionChordsResponse(result);
+    }
+  } catch {
+    // Serverless proxy not deployed or unreachable
+  }
+
+  if (options?.apiKey) {
+    if (provider === 'gemini') {
+      return detectChordsWithGemini(image, options.apiKey);
+    }
+    if (provider === 'openai') {
+      return detectChordsWithOpenAI(image, options.apiKey);
+    }
+    return detectChordsWithOpenRouter(image, options.apiKey, layout);
+  }
+
+  if (nodeKey && provider === 'openrouter') {
+    return detectChordsWithOpenRouter(image, nodeKey, layout);
+  }
+
+  return [];
+}
+
+export function systemsToMontageSlices(
+  systems: StaffSystem[],
+  raster: GrayRaster
+): Array<{ srcY: number; srcH: number }> {
+  return systems.map((system) => {
+    const srcY = Math.max(0, system.chordBandTop / raster.scale);
+    const srcBottom = Math.min(raster.sourceHeight, system.chordBandBottom / raster.scale);
+    return {
+      srcY,
+      srcH: Math.max(12, srcBottom - srcY),
+    };
+  });
+}
+
+/**
+ * Layout-aware Vision: staff-band montage when staves exist, otherwise full page.
+ * Uses only free OpenRouter models (or an explicit paid provider the user chose).
+ */
+export async function detectChordsWithSheetLayout(
+  imageSource: string,
+  options: VisionAiOptions & {
+    systems: StaffSystem[];
+    raster: GrayRaster;
+    invertFullPage?: boolean;
+  }
+): Promise<ChordPosition[]> {
+  if (!canAttemptVision(options)) return [];
+
+  const invert = Boolean(options.invertFullPage);
+  let layout: VisionSheetLayout = 'full-sheet';
+  let image = await prepareSheetImageForVision(
+    invert ? await sheetToDataUrl(imageSource, true) : imageSource
+  );
+
+  if (options.systems.length > 0) {
+    const montage = await buildChordBandMontage(
+      imageSource,
+      systemsToMontageSlices(options.systems, options.raster),
+      options.raster.sourceWidth,
+      options.raster.sourceHeight,
+      invert
+    );
+    if (!montage) return [];
+    layout = 'staff-bands';
+    image = montage.dataUrl;
+    const parsed = await requestVisionChords(image, layout, options);
+    return mapMontageChordsToPage(parsed, montage);
+  }
+
+  const parsed = await requestVisionChords(image, layout, options);
+  return alignDetectedChords(image, parsed);
+}
+
 /**
  * Main Vision AI coordinator function
  * Tries serverless/local proxy `/api/detect-chords` first (server holds OPENROUTER_API_KEY),
@@ -287,41 +411,9 @@ export async function scanSheetWithVisionAI(
   options?: VisionAiOptions
 ): Promise<ChordPosition[]> {
   const prepared = await prepareSheetImageForVision(imageDataUrl);
-  const provider = options?.provider || 'openrouter';
-  const endpoint = options?.apiEndpoint || '/api/detect-chords';
-
-  try {
-    const proxyResponse = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: prepared,
-        provider,
-      }),
-    });
-
-    if (proxyResponse.ok) {
-      const result = await proxyResponse.json();
-      const parsed = parseVisionChordsResponse(result);
-      if (parsed.length > 0) {
-        return alignDetectedChords(prepared, parsed);
-      }
-    }
-  } catch {
-    // Serverless proxy not deployed or unreachable in purely static mode
+  const detected = await requestVisionChords(prepared, 'full-sheet', options);
+  if (detected.length === 0 && !options?.apiKey && typeof window === 'undefined') {
+    throw new Error('No Vision AI key or serverless endpoint configured');
   }
-
-  if (options?.apiKey) {
-    let detected: ChordPosition[] = [];
-    if (provider === 'gemini') {
-      detected = await detectChordsWithGemini(prepared, options.apiKey);
-    } else if (provider === 'openai') {
-      detected = await detectChordsWithOpenAI(prepared, options.apiKey);
-    } else {
-      detected = await detectChordsWithOpenRouter(prepared, options.apiKey);
-    }
-    return alignDetectedChords(prepared, detected);
-  }
-
-  throw new Error('No Vision AI key or serverless endpoint configured');
+  return alignDetectedChords(prepared, detected);
 }

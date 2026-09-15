@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   assertFreeOpenRouterModel,
   buildOpenRouterVisionBody,
+  extractJsonObject,
   extractOpenRouterMessageContent,
   hasNonEmptyChordsPayload,
   isFreeOpenRouterModel,
   OPENROUTER_FREE_MODEL,
   OPENROUTER_FREE_MODEL_CANDIDATES,
+  OPENROUTER_PREFERRED_VL_MODEL,
 } from './openRouterClient';
 
 describe('OpenRouter free-model client', () => {
@@ -19,7 +21,10 @@ describe('OpenRouter free-model client', () => {
     expect(() => assertFreeOpenRouterModel('google/gemini-2.5-flash')).toThrow(/paid OpenRouter model/);
   });
 
-  it('never includes paid model slugs in the candidate list', () => {
+  it('prefers a dedicated free VL model and never includes paid slugs', () => {
+    expect(OPENROUTER_PREFERRED_VL_MODEL.endsWith(':free')).toBe(true);
+    expect(OPENROUTER_FREE_MODEL_CANDIDATES[0]).toBe(OPENROUTER_PREFERRED_VL_MODEL);
+    expect(OPENROUTER_FREE_MODEL_CANDIDATES).toContain(OPENROUTER_FREE_MODEL);
     OPENROUTER_FREE_MODEL_CANDIDATES.forEach((model) => {
       expect(isFreeOpenRouterModel(model)).toBe(true);
     });
@@ -56,5 +61,8 @@ describe('OpenRouter free-model client', () => {
     expect(hasNonEmptyChordsPayload('{"chords":[{"chord":"C"}]}')).toBe(true);
     expect(hasNonEmptyChordsPayload('{"chords":[]}')).toBe(false);
     expect(hasNonEmptyChordsPayload('safe')).toBe(false);
+    expect(extractJsonObject('noise {"chords":[{"chord":"Dm7"}]} ok')?.chords).toEqual([
+      { chord: 'Dm7' },
+    ]);
   });
 });

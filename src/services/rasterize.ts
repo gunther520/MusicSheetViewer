@@ -17,6 +17,27 @@ export interface BandImage {
   upscale: number;
 }
 
+export interface MontageSlice {
+  montageY0: number;
+  montageY1: number;
+  srcY: number;
+  srcH: number;
+}
+
+export interface ChordBandMontage {
+  dataUrl: string;
+  width: number;
+  height: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  slices: MontageSlice[];
+}
+
+export interface ChordBandSliceRequest {
+  srcY: number;
+  srcH: number;
+}
+
 function meanLumaOf(gray: Uint8Array): number {
   let sum = 0;
   const step = Math.max(1, Math.floor(gray.length / 6000));
@@ -164,4 +185,127 @@ export async function cropBandForOcr(
     ctx.putImageData(imageData, 0, 0);
   }
   return { target: canvas, width, height, srcX, srcY, upscale };
+}
+
+function bufferToJpegDataUrl(buffer: Uint8Array | Buffer): string {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return `data:image/jpeg;base64,${btoa(binary)}`;
+}
+
+/**
+ * Stack full-width chord-band crops into one image for a single Vision call.
+ */
+export async function buildChordBandMontage(
+  source: string | HTMLImageElement,
+  slices: ChordBandSliceRequest[],
+  sourceWidth: number,
+  sourceHeight: number,
+  invert = false
+): Promise<ChordBandMontage | null> {
+  const usable = slices.filter((slice) => slice.srcH >= 8 && sourceWidth >= 8);
+  if (usable.length === 0 || sourceWidth <= 0 || sourceHeight <= 0) return null;
+
+  const upscale = Math.min(2.2, 1600 / Math.max(1, sourceWidth));
+  const gap = 8;
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    const { buildMontageWithSharp } = await import('./rasterizeNode');
+    const built = await buildMontageWithSharp(
+      typeof source === 'string' ? source : source.src,
+      usable,
+      sourceWidth,
+      invert,
+      upscale,
+      gap
+    );
+    const dataUrl = typeof Buffer !== 'undefined'
+      ? `data:image/jpeg;base64,${Buffer.from(built.buffer).toString('base64')}`
+      : bufferToJpegDataUrl(built.buffer);
+    return {
+      dataUrl,
+      width: built.width,
+      height: built.height,
+      sourceWidth,
+      sourceHeight,
+      slices: built.slices,
+    };
+  }
+
+  const img = typeof source === 'string' ? await loadDomImage(source) : source;
+  const outW = Math.max(8, Math.round(sourceWidth * upscale));
+  const bandHeights = usable.map((slice) => Math.max(24, Math.round(slice.srcH * upscale)));
+  const outH = bandHeights.reduce((sum, h) => sum + h, 0) + gap * (usable.length - 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, outW, outH);
+
+  const mapped: MontageSlice[] = [];
+  let y = 0;
+  usable.forEach((slice, i) => {
+    const h = bandHeights[i];
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, slice.srcY, sourceWidth, slice.srcH, 0, y, outW, h);
+    if (invert) {
+      const imageData = ctx.getImageData(0, y, outW, h);
+      const data = imageData.data;
+      for (let p = 0; p < data.length; p += 4) {
+        data[p] = 255 - data[p];
+        data[p + 1] = 255 - data[p + 1];
+        data[p + 2] = 255 - data[p + 2];
+      }
+      ctx.putImageData(imageData, 0, y);
+    }
+    mapped.push({
+      montageY0: y,
+      montageY1: y + h,
+      srcY: slice.srcY,
+      srcH: slice.srcH,
+    });
+    y += h + gap;
+  });
+
+  return {
+    dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+    width: outW,
+    height: outH,
+    sourceWidth,
+    sourceHeight,
+    slices: mapped,
+  };
+}
+
+export async function sheetToDataUrl(
+  source: string,
+  invert = false,
+  maxDim = 1600
+): Promise<string> {
+  if (source.startsWith('data:') && !invert) return source;
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    const { fileToVisionJpegDataUrl } = await import('./rasterizeNode');
+    if (source.startsWith('data:')) return source;
+    return fileToVisionJpegDataUrl(source, maxDim, invert);
+  }
+
+  if (invert) {
+    const inverted = await invertSheetForOcr(source, maxDim);
+    if (inverted instanceof HTMLCanvasElement) {
+      return inverted.toDataURL('image/jpeg', 0.85);
+    }
+  }
+
+  if (source.startsWith('data:') || source.startsWith('blob:') || source.startsWith('http')) {
+    return source;
+  }
+  return source;
 }

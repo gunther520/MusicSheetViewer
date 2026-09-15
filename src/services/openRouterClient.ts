@@ -9,16 +9,21 @@ export const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions
 /** Free Models Router: picks a free model that supports the requested features (images, etc.). */
 export const OPENROUTER_FREE_MODEL = 'openrouter/free';
 
-/** Explicit free vision fallbacks if the router is unavailable. All slugs must stay `:free`. */
+/** Dedicated free vision-language model; more reliable for chord glyphs than a random router pick. */
+export const OPENROUTER_PREFERRED_VL_MODEL = 'inclusionai/ling-3.0-flash-vl:free';
+
+/** Explicit free vision fallbacks if the preferred VL model is unavailable. All slugs must stay `:free`. */
 export const OPENROUTER_FREE_FALLBACK_MODELS = [
-  'inclusionai/ling-3.0-flash-vl:free',
+  OPENROUTER_PREFERRED_VL_MODEL,
   'google/gemma-4-26b-a4b-it:free',
   'google/gemma-4-31b-it:free',
 ] as const;
 
 export const OPENROUTER_FREE_MODEL_CANDIDATES = [
+  OPENROUTER_PREFERRED_VL_MODEL,
   OPENROUTER_FREE_MODEL,
-  ...OPENROUTER_FREE_FALLBACK_MODELS,
+  'google/gemma-4-26b-a4b-it:free',
+  'google/gemma-4-31b-it:free',
 ] as const;
 
 export function isFreeOpenRouterModel(model: string): boolean {
@@ -111,8 +116,8 @@ export function extractOpenRouterMessageContent(data: unknown): string {
   return '';
 }
 
-export function hasNonEmptyChordsPayload(raw: string): boolean {
-  if (!raw || !raw.trim()) return false;
+export function extractJsonObject(raw: string): Record<string, unknown> | null {
+  if (!raw || !raw.trim()) return null;
   const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
@@ -121,21 +126,27 @@ export function hasNonEmptyChordsPayload(raw: string): boolean {
     : cleaned;
   try {
     const parsed = JSON.parse(jsonSlice);
-    const list = Array.isArray(parsed?.chords)
-      ? parsed.chords
-      : Array.isArray(parsed)
-        ? parsed
-        : [];
-    return list.some((item: unknown) => {
-      if (typeof item === 'string') return item.trim().length > 0;
-      if (item && typeof item === 'object' && 'chord' in item) {
-        return String((item as { chord?: unknown }).chord || '').trim().length > 0;
-      }
-      return false;
-    });
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function hasNonEmptyChordsPayload(raw: string): boolean {
+  const parsed = extractJsonObject(raw);
+  if (!parsed) return false;
+  const list = Array.isArray(parsed.chords)
+    ? parsed.chords
+    : Array.isArray(parsed)
+      ? parsed
+      : [];
+  return list.some((item: unknown) => {
+    if (typeof item === 'string') return item.trim().length > 0;
+    if (item && typeof item === 'object' && 'chord' in item) {
+      return String((item as { chord?: unknown }).chord || '').trim().length > 0;
+    }
+    return false;
+  });
 }
 
 export async function completeOpenRouterVision(options: {
@@ -143,11 +154,12 @@ export async function completeOpenRouterVision(options: {
   apiKey: string;
   systemPrompt: string;
   preferredModel?: string;
+  userText?: string;
 }): Promise<{ raw: string; model: string }> {
   const imageUrl = toOpenRouterImageUrl(options.image);
   const preferred = options.preferredModel
     ? assertFreeOpenRouterModel(options.preferredModel)
-    : OPENROUTER_FREE_MODEL;
+    : OPENROUTER_PREFERRED_VL_MODEL;
 
   const models = [
     preferred,
@@ -160,7 +172,12 @@ export async function completeOpenRouterVision(options: {
     const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: buildOpenRouterHeaders(options.apiKey),
-      body: JSON.stringify(buildOpenRouterVisionBody(imageUrl, options.systemPrompt, model)),
+      body: JSON.stringify(buildOpenRouterVisionBody(
+        imageUrl,
+        options.systemPrompt,
+        model,
+        options.userText
+      )),
     });
 
     if (!response.ok) {
