@@ -627,10 +627,16 @@ export async function scanSheetForChords(
   }
 }
 
+export interface HybridScanResult {
+  chords: ChordPosition[];
+  visionUsed: boolean;
+  visionModel?: string;
+  visionError?: string;
+}
+
 /**
  * General hybrid scan: layout OCR and free Vision AI in parallel, then merge.
- * Staff-band crops go to Vision when staves have symbol-like ink; otherwise a
- * full-page Vision pass is used for lyric charts and diagrams.
+ * Staff-band crops go to Vision; lyric charts and diagrams use a full-page pass.
  * Never short-circuits on filename or known sample identity.
  */
 export async function scanSheetWithFallback(
@@ -641,7 +647,7 @@ export async function scanSheetWithFallback(
     apiEndpoint?: string;
   },
   onProgress?: (progress: ScanProgress) => void
-): Promise<ChordPosition[]> {
+): Promise<HybridScanResult> {
   const imageUrl = typeof imageSource === 'string'
     ? imageSource
     : (imageSource as HTMLImageElement).src;
@@ -653,6 +659,7 @@ export async function scanSheetWithFallback(
   const keepYRangesPct = systems.length > 0
     ? staffSystemsToKeepYRangesPct(systems, raster.height)
     : undefined;
+  const visionSystems = inkSystems.length > 0 ? inkSystems : systems;
 
   const ocrPromise = scanSheetForChords(imageSource, (progress) => {
     onProgress?.({
@@ -663,13 +670,12 @@ export async function scanSheetWithFallback(
 
   const visionPromise = (async () => {
     const { canAttemptVision, detectChordsWithSheetLayout } = await import('./visionAiService');
-    const staffedWithoutInk = systems.length > 0 && inkSystems.length === 0;
-    if (staffedWithoutInk || !canAttemptVision(visionOptions)) {
-      return [] as ChordPosition[];
+    if (!canAttemptVision(visionOptions)) {
+      return { chords: [], error: 'Vision AI is not configured' };
     }
     onProgress?.({ status: 'Reading chord symbols with free Vision AI...', progress: 0.18 });
     return detectChordsWithSheetLayout(imageUrl, {
-      systems: systems.length > 0 ? inkSystems : [],
+      systems: visionSystems,
       raster,
       invertFullPage: raster.meanLuma < 90,
       apiKey: visionOptions?.apiKey,
@@ -678,18 +684,32 @@ export async function scanSheetWithFallback(
     });
   })();
 
-  const [ocrChords, visionChords] = await Promise.all([
+  const [ocrChords, visionResult] = await Promise.all([
     ocrPromise,
-    visionPromise.catch((visionErr) => {
-      console.warn('Vision AI scan failed or unavailable:', visionErr);
-      return [] as ChordPosition[];
-    }),
+    visionPromise.catch((visionErr) => ({
+      chords: [] as ChordPosition[],
+      model: undefined as string | undefined,
+      error: visionErr instanceof Error ? visionErr.message : String(visionErr),
+    })),
   ]);
 
   onProgress?.({ status: 'Merging OCR and Vision detections...', progress: 0.94 });
-  const merged = mergeChordDetections(ocrChords, visionChords, keepYRangesPct);
-  onProgress?.({ status: 'Completed!', progress: 1 });
-  return merged;
+  const merged = mergeChordDetections(ocrChords, visionResult.chords || [], keepYRangesPct);
+  const visionUsed = Boolean(visionResult.model) || (visionResult.chords || []).length > 0;
+  if (visionUsed && visionResult.model) {
+    onProgress?.({
+      status: `Merged OCR with free Vision (${visionResult.model})`,
+      progress: 1,
+    });
+  } else {
+    onProgress?.({ status: 'Completed!', progress: 1 });
+  }
+  return {
+    chords: merged,
+    visionUsed,
+    visionModel: visionResult.model,
+    visionError: visionResult.error,
+  };
 }
 
 async function getImageDimensionsNode(source: string): Promise<{ width: number; height: number }> {

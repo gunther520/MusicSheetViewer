@@ -167,16 +167,16 @@ export async function detectChordsWithOpenRouter(
   imageBase64OrUrl: string,
   apiKey: string,
   layout: VisionSheetLayout = 'full-sheet'
-): Promise<ChordPosition[]> {
+): Promise<{ chords: ChordPosition[]; model: string }> {
   const prompts = resolveVisionPrompts(layout);
-  const { raw } = await completeOpenRouterVision({
+  const { raw, model } = await completeOpenRouterVision({
     image: imageBase64OrUrl,
     apiKey,
     systemPrompt: prompts.system,
     userText: prompts.user,
     preferredModel: OPENROUTER_PREFERRED_VL_MODEL,
   });
-  return parseVisionChordsResponse(raw);
+  return { chords: parseVisionChordsResponse(raw), model };
 }
 
 /**
@@ -301,16 +301,38 @@ async function alignDetectedChords(imageDataUrl: string, chords: ChordPosition[]
   }
 }
 
+export interface VisionChordResult {
+  chords: ChordPosition[];
+  model?: string;
+  error?: string;
+}
+
 async function requestVisionChords(
   image: string,
   layout: VisionSheetLayout,
   options?: VisionAiOptions
-): Promise<ChordPosition[]> {
+): Promise<VisionChordResult> {
   const provider = options?.provider || 'openrouter';
-  const nodeKey = options?.apiKey || readOpenRouterEnvKey();
+  const clientKey = options?.apiKey;
+  const envKey = readOpenRouterEnvKey();
 
-  if (nodeKey && typeof window === 'undefined' && provider === 'openrouter') {
-    return detectChordsWithOpenRouter(image, nodeKey, layout);
+  if (provider === 'openrouter' && (typeof window === 'undefined') && (clientKey || envKey)) {
+    try {
+      const direct = await detectChordsWithOpenRouter(image, (clientKey || envKey) as string, layout);
+      return { chords: direct.chords, model: direct.model };
+    } catch (error: any) {
+      return { chords: [], error: error?.message || 'OpenRouter call failed' };
+    }
+  }
+
+  // Browser: call OpenRouter directly so Hobby/serverless timeouts cannot skip Vision.
+  if (provider === 'openrouter' && clientKey && clientKey.startsWith('sk-or-')) {
+    try {
+      const direct = await detectChordsWithOpenRouter(image, clientKey, layout);
+      return { chords: direct.chords, model: direct.model };
+    } catch (error: any) {
+      return { chords: [], error: error?.message || 'Direct OpenRouter call failed' };
+    }
   }
 
   const endpoint = options?.apiEndpoint || '/api/detect-chords';
@@ -322,32 +344,53 @@ async function requestVisionChords(
         image,
         provider,
         layout,
+        apiKey: clientKey,
       }),
     });
 
-    if (proxyResponse.ok) {
+    const contentType = proxyResponse.headers.get('content-type') || '';
+    if (proxyResponse.ok && contentType.includes('json')) {
       const result = await proxyResponse.json();
-      return parseVisionChordsResponse(result);
+      const chords = parseVisionChordsResponse(result);
+      const model = typeof result?.model === 'string' ? result.model : undefined;
+      return { chords, model };
     }
-  } catch {
-    // Serverless proxy not deployed or unreachable
-  }
-
-  if (options?.apiKey) {
-    if (provider === 'gemini') {
-      return detectChordsWithGemini(image, options.apiKey);
+    if (!proxyResponse.ok) {
+      const text = await proxyResponse.text();
+      const errJson = extractJsonObject(text);
+      const message = (typeof errJson?.error === 'string' && errJson.error)
+        || text.slice(0, 180)
+        || `Vision API ${proxyResponse.status}`;
+      const fallback = await fallbackClientVision(image, layout, provider, clientKey);
+      if (fallback) return fallback;
+      return { chords: [], error: message };
     }
-    if (provider === 'openai') {
-      return detectChordsWithOpenAI(image, options.apiKey);
-    }
-    return detectChordsWithOpenRouter(image, options.apiKey, layout);
+    return { chords: [], error: 'Vision API returned a non-JSON response' };
+  } catch (error: any) {
+    const fallback = await fallbackClientVision(image, layout, provider, clientKey);
+    if (fallback) return fallback;
+    return { chords: [], error: error?.message || 'Vision proxy unreachable' };
   }
+}
 
-  if (nodeKey && provider === 'openrouter') {
-    return detectChordsWithOpenRouter(image, nodeKey, layout);
+async function fallbackClientVision(
+  image: string,
+  layout: VisionSheetLayout,
+  provider: string,
+  clientKey?: string
+): Promise<VisionChordResult | null> {
+  if (!clientKey) return null;
+  if (provider === 'gemini') {
+    return { chords: await detectChordsWithGemini(image, clientKey) };
   }
-
-  return [];
+  if (provider === 'openai') {
+    return { chords: await detectChordsWithOpenAI(image, clientKey) };
+  }
+  if (provider === 'openrouter') {
+    const direct = await detectChordsWithOpenRouter(image, clientKey, layout);
+    return { chords: direct.chords, model: direct.model };
+  }
+  return null;
 }
 
 export function systemsToMontageSlices(
@@ -375,8 +418,10 @@ export async function detectChordsWithSheetLayout(
     raster: GrayRaster;
     invertFullPage?: boolean;
   }
-): Promise<ChordPosition[]> {
-  if (!canAttemptVision(options)) return [];
+): Promise<VisionChordResult> {
+  if (!canAttemptVision(options)) {
+    return { chords: [], error: 'Vision AI is not configured' };
+  }
 
   const invert = Boolean(options.invertFullPage);
   const fullPage = await prepareSheetImageForVision(
@@ -394,22 +439,30 @@ export async function detectChordsWithSheetLayout(
     if (montage) {
       try {
         const parsed = await requestVisionChords(montage.dataUrl, 'staff-bands', options);
-        const mapped = mapMontageChordsToPage(parsed, montage);
-        if (mapped.length > 0) return mapped;
+        const mapped = mapMontageChordsToPage(parsed.chords, montage);
+        if (mapped.length > 0) return { ...parsed, chords: mapped };
+        if (parsed.error && !parsed.chords.length) {
+          // still try full page
+        } else if (parsed.model && parsed.chords.length === 0) {
+          // model ran, empty bands — try full page next
+        }
       } catch (error) {
         console.warn('Staff-band Vision failed; trying full-sheet free Vision:', error);
       }
     }
     try {
       return await requestVisionChords(fullPage, 'full-sheet', options);
-    } catch (error) {
+    } catch (error: any) {
       console.warn('Full-sheet Vision failed after staff-band pass:', error);
-      return [];
+      return { chords: [], error: error?.message || 'Vision AI failed' };
     }
   }
 
   const parsed = await requestVisionChords(fullPage, 'full-sheet', options);
-  return alignDetectedChords(fullPage, parsed);
+  return {
+    ...parsed,
+    chords: await alignDetectedChords(fullPage, parsed.chords),
+  };
 }
 
 /**
@@ -424,8 +477,8 @@ export async function scanSheetWithVisionAI(
 ): Promise<ChordPosition[]> {
   const prepared = await prepareSheetImageForVision(imageDataUrl);
   const detected = await requestVisionChords(prepared, 'full-sheet', options);
-  if (detected.length === 0 && !options?.apiKey && typeof window === 'undefined') {
-    throw new Error('No Vision AI key or serverless endpoint configured');
+  if (detected.chords.length === 0 && detected.error && typeof window === 'undefined') {
+    throw new Error(detected.error);
   }
-  return alignDetectedChords(prepared, detected);
+  return alignDetectedChords(prepared, detected.chords);
 }

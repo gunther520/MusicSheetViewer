@@ -80,7 +80,7 @@ export const App: React.FC = () => {
     setScanStatus('Scanning chord symbols with layout OCR and free Vision AI...');
 
     try {
-      const detected = await scanSheetWithFallback(
+      const result = await scanSheetWithFallback(
         sheetImage,
         {
           apiKey: visionApiKey || undefined,
@@ -92,10 +92,19 @@ export const App: React.FC = () => {
           setScanProgress(p.progress);
         }
       );
+      const detected = result.chords;
 
       if (detected.length > 0) {
         setChords(detected);
-        showNotification(`Success! Found ${detected.length} chords on your music sheet.`);
+        if (result.visionUsed && result.visionModel) {
+          showNotification(`Found ${detected.length} chords using OCR + free Vision (${result.visionModel}).`);
+        } else if (result.visionError) {
+          showNotification(`Found ${detected.length} chords with OCR. Vision AI skipped: ${result.visionError}`);
+        } else {
+          showNotification(`Success! Found ${detected.length} chords on your music sheet.`);
+        }
+      } else if (result.visionError) {
+        showNotification(`No chords detected. Vision AI: ${result.visionError}`);
       } else {
         showNotification('No chords automatically detected. You can click anywhere on the sheet to place chords!');
       }

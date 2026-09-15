@@ -37,7 +37,7 @@ An interactive sheet music application that allows musicians to photograph or up
 - **Full Progression Playback**: "Play All Chords Preview" button plays through the entire piece's chords in sequence.
 
 ### 5. Automatic Chord Detection
-- **Hybrid scan**: Layout-aware OCR first (crop the chord band above each staff), then free OpenRouter Vision if OCR finds nothing.
+- **Hybrid scan**: Layout OCR and **free OpenRouter Vision** run together. Paste a free `sk-or-...` key in the toolbar, or set `OPENROUTER_API_KEY` on Vercel. The scan toast reports which Vision model was used.
 - **Staff-aware placement**: Chord-band detection from staff-line geometry, not from filenames or known pieces.
 - **Tesseract.js**: Local in-browser OCR on staff chord bands or sparse full-page reads for lyric charts.
 - **Chord Token Filter**: Cleans noise, filters out lyrics, and extracts chord positions.
@@ -75,7 +75,7 @@ Chord scanning uses OpenRouter's **free models router** (`openrouter/free`) and 
    ```
    Do **not** prefix this with `VITE_`. Vite would embed it in the browser bundle.
 2. On Vercel, add the same `OPENROUTER_API_KEY` project environment variable for Production.
-3. `npm run dev` proxies `/api/detect-chords` with that server key. If Vision fails, the app falls back to local OCR.
+3. `npm run dev` proxies `/api/detect-chords` with that server key. On Vercel production, `/api/detect-chords` uses the same env var. You can also paste a free `sk-or-...` key in the app; the browser then calls OpenRouter directly so Vision is not dropped when the serverless function times out.
 
 ### Run Tests
 ```bash

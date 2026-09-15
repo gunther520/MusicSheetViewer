@@ -48,10 +48,11 @@ describe.skipIf(!apiKey)('OpenRouter free live chord detection', () => {
 
   it('hybrid OCR + free Vision finds chords on a random online hymn lead sheet', async () => {
     const file = path.resolve(__dirname, '../testing/random_sheets/are_you_washed_1200.png');
-    const chords = await scanSheetWithFallback(file, {
+    const result = await scanSheetWithFallback(file, {
       apiKey: apiKey as string,
       provider: 'openrouter',
     });
+    const chords = result.chords;
     const names = chords.map((chord) => chord.originalText);
     expect(names).toContain('C');
     expect(names).toContain('F');
@@ -66,10 +67,11 @@ describe.skipIf(!apiKey)('OpenRouter free live chord detection', () => {
 
   it('merges OCR with free Vision on a dark online jazz chart', async () => {
     const file = path.resolve(__dirname, '../testing/random_sheets/lesheets_chords.png');
-    const chords = await scanSheetWithFallback(file, {
+    const result = await scanSheetWithFallback(file, {
       apiKey: apiKey as string,
       provider: 'openrouter',
     });
+    const chords = result.chords;
     const names = chords.map((chord) => chord.originalText);
     expect(names).toContain('Dm7');
     expect(names).toContain('Em7');

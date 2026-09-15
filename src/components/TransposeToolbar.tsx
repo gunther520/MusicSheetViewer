@@ -377,7 +377,9 @@ export const TransposeToolbar: React.FC<TransposeToolbarProps> = ({
                 </span>
                 <span className="text-[10px] text-slate-400">
                   {visionProvider === 'openrouter'
-                    ? 'Layout OCR + OpenRouter free Vision together (staff-band crops)'
+                    ? (visionApiKey
+                      ? 'Free OpenRouter Vision runs in the browser with your key'
+                      : 'Paste a free OpenRouter key (sk-or-...) or set OPENROUTER_API_KEY on Vercel')
                     : visionApiKey
                       ? 'Vision AI mode active'
                       : 'Paste a key or switch back to OpenRouter free'}
