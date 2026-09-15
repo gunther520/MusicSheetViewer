@@ -96,12 +96,13 @@ export const App: React.FC = () => {
 
       if (detected.length > 0) {
         setChords(detected);
+        const keyBit = result.inferredKey ? ` Key: ${result.inferredKey}.` : '';
         if (result.visionUsed && result.visionModel) {
-          showNotification(`Found ${detected.length} chords using OCR + free Vision (${result.visionModel}).`);
+          showNotification(`Found ${detected.length} chords using OCR + free Vision (${result.visionModel}).${keyBit}`);
         } else if (result.visionError) {
-          showNotification(`Found ${detected.length} chords with OCR. Vision AI skipped: ${result.visionError}`);
+          showNotification(`Found ${detected.length} chords with OCR.${keyBit} Vision AI skipped: ${result.visionError}`);
         } else {
-          showNotification(`Success! Found ${detected.length} chords on your music sheet.`);
+          showNotification(`Success! Found ${detected.length} chords on your music sheet.${keyBit}`);
         }
       } else if (result.visionError) {
         showNotification(`No chords detected. Vision AI: ${result.visionError}`);

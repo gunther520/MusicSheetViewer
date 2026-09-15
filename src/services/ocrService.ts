@@ -14,6 +14,11 @@ import {
 } from './staffGeometry';
 import { cropBandForOcr, invertSheetForOcr, rasterizeSheet } from './rasterize';
 import { mergeChordDetections, placeVisionOnStaffBands } from './mergeChordDetections';
+import {
+  extractPrintedKeyLabels,
+  refineDetectedChords,
+  resolveSongKey,
+} from './musicTheory';
 
 export type { ChordPosition };
 export { isValidChord };
@@ -512,10 +517,10 @@ function systemsToSourceBands(systems: StaffSystem[], scale: number): Array<{ to
  * If no staves are found (lyric charts, graphic chord diagrams), a full sparse OCR pass is used.
  * Never short-circuits on filename or known sample identity.
  */
-export async function scanSheetForChords(
+async function runLayoutOcr(
   imageSource: string | HTMLImageElement,
   onProgress?: (progress: ScanProgress) => void
-): Promise<ChordPosition[]> {
+): Promise<{ chords: ChordPosition[]; printedKeyLabels: string[] }> {
   onProgress?.({ status: 'Analyzing sheet layout...', progress: 0.08 });
 
   const img = await loadImage(imageSource);
@@ -614,9 +619,10 @@ export async function scanSheetForChords(
       if (w.y1 > derivedHeight) derivedHeight = Math.ceil(w.y1 * 1.02);
     });
 
+    const printedKeyLabels = extractPrintedKeyLabels(candidateTokens, derivedHeight);
     const chords = filterAndClusterChords(candidateTokens, derivedWidth, derivedHeight, keepYRanges);
     onProgress?.({ status: 'Completed!', progress: 1 });
-    return chords;
+    return { chords, printedKeyLabels };
   } catch (error) {
     console.error('OCR Error:', error);
     try {
@@ -628,11 +634,20 @@ export async function scanSheetForChords(
   }
 }
 
+export async function scanSheetForChords(
+  imageSource: string | HTMLImageElement,
+  onProgress?: (progress: ScanProgress) => void
+): Promise<ChordPosition[]> {
+  const { chords, printedKeyLabels } = await runLayoutOcr(imageSource, onProgress);
+  return refineDetectedChords(chords, printedKeyLabels).chords;
+}
+
 export interface HybridScanResult {
   chords: ChordPosition[];
   visionUsed: boolean;
   visionModel?: string;
   visionError?: string;
+  inferredKey?: string;
 }
 
 /**
@@ -662,7 +677,7 @@ export async function scanSheetWithFallback(
     : undefined;
   const visionSystems = inkSystems.length > 0 ? inkSystems : systems;
 
-  const ocrPromise = scanSheetForChords(imageSource, (progress) => {
+  const ocrPromise = runLayoutOcr(imageSource, (progress) => {
     onProgress?.({
       status: progress.status,
       progress: 0.08 + progress.progress * 0.5,
@@ -685,7 +700,7 @@ export async function scanSheetWithFallback(
     });
   })();
 
-  const [ocrChords, visionResult] = await Promise.all([
+  const [ocrResult, visionResult] = await Promise.all([
     ocrPromise,
     visionPromise.catch((visionErr) => ({
       chords: [] as ChordPosition[],
@@ -695,26 +710,35 @@ export async function scanSheetWithFallback(
   ]);
 
   onProgress?.({ status: 'Merging OCR and Vision detections...', progress: 0.94 });
+  const ocrChords = ocrResult.chords;
   const visionRaw = visionResult.chords || [];
   const dropHallucinations = ocrChords.length === 0 && inkSystems.length === 0 && systems.length > 0;
   const visionPlaced = dropHallucinations
     ? []
     : placeVisionOnStaffBands(visionRaw, keepYRangesPct);
-  const merged = mergeChordDetections(ocrChords, visionPlaced, keepYRangesPct);
+  const previewKey = resolveSongKey({
+    labels: ocrResult.printedKeyLabels,
+    chords: [...ocrChords, ...visionPlaced].map((chord) => chord.originalText),
+  });
+  const merged = mergeChordDetections(ocrChords, visionPlaced, keepYRangesPct, previewKey);
+  const refined = refineDetectedChords(merged, ocrResult.printedKeyLabels);
   const visionUsed = Boolean(visionResult.model) || (visionResult.chords || []).length > 0;
   if (visionUsed && visionResult.model) {
     onProgress?.({
-      status: `Merged OCR with free Vision (${visionResult.model})`,
+      status: refined.key
+        ? `Merged OCR with free Vision (${visionResult.model}); key ${refined.key.name}`
+        : `Merged OCR with free Vision (${visionResult.model})`,
       progress: 1,
     });
   } else {
     onProgress?.({ status: 'Completed!', progress: 1 });
   }
   return {
-    chords: merged,
+    chords: refined.chords,
     visionUsed,
     visionModel: visionResult.model,
     visionError: visionResult.error,
+    inferredKey: refined.key?.name,
   };
 }
 

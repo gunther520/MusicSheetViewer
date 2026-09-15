@@ -14,6 +14,8 @@ describe('Vision AI Service', () => {
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('xPercent');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('yPercent');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('{"chords":[]}');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('key signature');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('Never invent I–IV–V');
   });
 
   it('uses a stacked staff-band prompt for layout-aware Vision', () => {
@@ -23,6 +25,7 @@ describe('Vision AI Service', () => {
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('C/E');
     expect(resolveVisionPrompts('staff-bands').system).toBe(VISION_BAND_MONTAGE_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet').system).toBe(VISION_DETECTION_SYSTEM_PROMPT);
+    expect(resolveVisionPrompts('full-sheet', 'This page appears to be in F major.').user).toContain('F major');
   });
 
   it('correctly parses raw structured JSON from Vision AI output', () => {

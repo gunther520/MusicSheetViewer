@@ -12,6 +12,7 @@ HOW TO READ A SYMBOL
 - Jazz glyphs: △ ∆ Δ = maj7 (C△7 and C△ both become Cmaj7). ø Ø = m7b5. -7 = m7. + or #5 after 7/maj7 stays (#5).
 - A raised/small 7 is quality 7. A raised 9 is 9. 11 is the digits one-one, not a 7. Cm11 is not Cm7. C11 is not C7.
 - Flats that look alike: Eb vs Bb, Ab vs Db, Gb vs F#. Read the LETTER first, then the flat.
+- If flat vs 7 is unclear (Bb vs B7, Eb vs E7), prefer the accidental already used on THIS page or in the key signature. Spell black-key roots the way that signature would (Bb not A# in a flat key; F# not Gb in a sharp key). Never invent I–IV–V or any glyph that is not printed.
 
 WHAT TO INCLUDE
 - Every printed occurrence. Identical C C C on one staff is THREE objects with different xPercent.
@@ -46,6 +47,7 @@ SYMBOL RULES (same as a real lead sheet)
 - Root A-G, optional #/b, optional quality, optional /bass. LEFT of slash is the chord, RIGHT is the bass (C/E, D/F#, Bb/C, G/B, Gm7/C).
 - Never drop or swap a slash. Never turn C/E into C.
 - △/∆/Δ = maj7. ø = m7b5. Superscript 11 is 11, not 7. Eb is not Bb.
+- Ambiguous accidentals: follow this page's key signature / prevailing flats or sharps. Do not invent missing chords from the key.
 - Repeats in the same strip are separate objects with different xPercent.
 - Simple C F G Am count. Do not skip them.
 
@@ -68,18 +70,22 @@ export const VISION_FULL_SHEET_USER_TEXT =
 export const VISION_BAND_MONTAGE_USER_TEXT =
   'Each numbered strip is one staff chord band. For every glyph: chord + strip + xPercent. Keep slashes and repeats. Blank strips contribute nothing. If none, {"chords":[]}.';
 
-export function resolveVisionPrompts(layout: VisionSheetLayout = 'full-sheet'): {
+export function resolveVisionPrompts(
+  layout: VisionSheetLayout = 'full-sheet',
+  keyHint?: string
+): {
   system: string;
   user: string;
 } {
+  const hint = keyHint && keyHint.trim() ? ` ${keyHint.trim()}` : '';
   if (layout === 'staff-bands') {
     return {
       system: VISION_BAND_MONTAGE_SYSTEM_PROMPT,
-      user: VISION_BAND_MONTAGE_USER_TEXT,
+      user: VISION_BAND_MONTAGE_USER_TEXT + hint,
     };
   }
   return {
     system: VISION_DETECTION_SYSTEM_PROMPT,
-    user: VISION_FULL_SHEET_USER_TEXT,
+    user: VISION_FULL_SHEET_USER_TEXT + hint,
   };
 }

@@ -26,6 +26,7 @@ Transcribe chord SYMBOLS actually printed in THIS image. Do not invent or comple
 HOW TO READ: Root A-G, optional #/b, optional quality, optional /bass.
 Slash: LEFT = chord, RIGHT = bass. C/E, D/F#, Bb/C, G/F, G/B, Gm7/C. Never drop or swap the slash.
 Jazz: △/∆/Δ = maj7 (write Cmaj7). ø = m7b5. Superscript 11 is 11 not 7. Eb is not Bb. Ab is not Db.
+If flat vs 7 is unclear, prefer this page's key signature / prevailing accidentals. Do not invent missing chords from the key.
 Include EVERY occurrence. Repeated C C C is three objects. Simple C F G Am still count.
 
 EXCLUDE lyrics, titles like "C Major", verse/chorus/intro, bar numbers, SATB, noteheads, N.C., lone | or /.
@@ -41,6 +42,7 @@ THIS image is a VERTICAL STACK of chord-symbol bands above each staff. Gray left
 
 Read each strip left-to-right. One object per glyph. strip = left-column number (required).
 Slash: LEFT chord, RIGHT bass (C/E, D/F#, Bb/C). △ = maj7. 11 is not 7. Repeats are separate objects. Include C F G.
+Ambiguous accidentals follow this page's key signature. Do not invent chords from the key.
 Blank strip → nothing. No symbols at all → {"chords":[]}. Do not invent.
 
 xPercent is 0-100 of the FULL stacked image (including the number gutter).
@@ -59,6 +61,7 @@ type JsonBody = {
   apiKey?: string;
   model?: string;
   layout?: string;
+  keyHint?: string;
 };
 
 function jsonResponse(status: number, body: unknown, nodeRes?: { status: (code: number) => { json: (value: unknown) => unknown } }) {
@@ -107,12 +110,26 @@ function extractMessage(data: any): string {
   return '';
 }
 
-async function completeFreeVision(image: string, apiKey: string, layout: string): Promise<{ raw: string; model: string }> {
+function sanitizeKeyHint(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const cleaned = raw.replace(/[\r\n]+/g, ' ').trim().slice(0, 400);
+  if (!cleaned) return '';
+  if (!/^[A-Za-z0-9 #,:'()–—\-./]+$/.test(cleaned)) return '';
+  return cleaned;
+}
+
+async function completeFreeVision(
+  image: string,
+  apiKey: string,
+  layout: string,
+  keyHint?: string
+): Promise<{ raw: string; model: string }> {
   const imageUrl = image.startsWith('http') || image.startsWith('data:')
     ? image
     : `data:image/jpeg;base64,${image}`;
   const system = layout === 'staff-bands' ? BAND_PROMPT : FULL_SHEET_PROMPT;
-  const user = layout === 'staff-bands' ? BAND_USER : FULL_SHEET_USER;
+  const hint = keyHint ? ` ${keyHint}` : '';
+  const user = (layout === 'staff-bands' ? BAND_USER : FULL_SHEET_USER) + hint;
 
   let lastError = 'OpenRouter free-model request failed';
   let emptyModel: string | undefined;
@@ -213,7 +230,8 @@ export default async function handler(req: any, res?: any) {
     const { raw, model: usedModel } = await completeFreeVision(
       image,
       openRouterKey,
-      body.layout === 'staff-bands' ? 'staff-bands' : 'full-sheet'
+      body.layout === 'staff-bands' ? 'staff-bands' : 'full-sheet',
+      sanitizeKeyHint(body.keyHint)
     );
     const parsed = extractJsonObject(raw) || { chords: [] };
     return jsonResponse(200, { ...parsed, model: usedModel }, res);

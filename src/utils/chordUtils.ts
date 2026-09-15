@@ -154,6 +154,16 @@ export function parseChord(chordStr: string): ParsedChord {
   };
 }
 
+/** Pitch class 0–11 for a note or chord root, or undefined if not a pitch. */
+export function notePitchClass(note: string): number | undefined {
+  const parsed = parseChord(note);
+  if (parsed.isValid) return NOTE_TO_SEMITONE[parsed.root];
+  const normalized = normalizeAccidentals(note.trim());
+  if (!normalized) return undefined;
+  const formatted = normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+  return NOTE_TO_SEMITONE[formatted];
+}
+
 /**
  * Checks if a string is a valid chord symbol
  */

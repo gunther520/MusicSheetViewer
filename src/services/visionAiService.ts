@@ -22,6 +22,7 @@ export interface VisionAiOptions {
   provider?: VisionProvider;
   apiKey?: string;
   apiEndpoint?: string;
+  keyHint?: string;
 }
 
 export interface DetectedVisionChord {
@@ -169,9 +170,10 @@ function readOpenRouterEnvKey(): string | undefined {
 export async function detectChordsWithOpenRouter(
   imageBase64OrUrl: string,
   apiKey: string,
-  layout: VisionSheetLayout = 'full-sheet'
+  layout: VisionSheetLayout = 'full-sheet',
+  keyHint?: string
 ): Promise<{ chords: ChordPosition[]; model: string }> {
-  const prompts = resolveVisionPrompts(layout);
+  const prompts = resolveVisionPrompts(layout, keyHint);
   const { raw, model } = await completeOpenRouterVision({
     image: imageBase64OrUrl,
     apiKey,
@@ -321,7 +323,12 @@ async function requestVisionChords(
 
   if (provider === 'openrouter' && (typeof window === 'undefined') && (clientKey || envKey)) {
     try {
-      const direct = await detectChordsWithOpenRouter(image, (clientKey || envKey) as string, layout);
+      const direct = await detectChordsWithOpenRouter(
+        image,
+        (clientKey || envKey) as string,
+        layout,
+        options?.keyHint
+      );
       return { chords: direct.chords, model: direct.model };
     } catch (error: any) {
       return { chords: [], error: error?.message || 'OpenRouter call failed' };
@@ -331,7 +338,7 @@ async function requestVisionChords(
   // Browser: call OpenRouter directly so Hobby/serverless timeouts cannot skip Vision.
   if (provider === 'openrouter' && clientKey && clientKey.startsWith('sk-or-')) {
     try {
-      const direct = await detectChordsWithOpenRouter(image, clientKey, layout);
+      const direct = await detectChordsWithOpenRouter(image, clientKey, layout, options?.keyHint);
       return { chords: direct.chords, model: direct.model };
     } catch (error: any) {
       return { chords: [], error: error?.message || 'Direct OpenRouter call failed' };
@@ -348,6 +355,7 @@ async function requestVisionChords(
         provider,
         layout,
         apiKey: clientKey,
+        keyHint: options?.keyHint,
       }),
     });
 
@@ -364,13 +372,13 @@ async function requestVisionChords(
       const message = (typeof errJson?.error === 'string' && errJson.error)
         || text.slice(0, 180)
         || `Vision API ${proxyResponse.status}`;
-      const fallback = await fallbackClientVision(image, layout, provider, clientKey);
+      const fallback = await fallbackClientVision(image, layout, provider, clientKey, options?.keyHint);
       if (fallback) return fallback;
       return { chords: [], error: message };
     }
     return { chords: [], error: 'Vision API returned a non-JSON response' };
   } catch (error: any) {
-    const fallback = await fallbackClientVision(image, layout, provider, clientKey);
+    const fallback = await fallbackClientVision(image, layout, provider, clientKey, options?.keyHint);
     if (fallback) return fallback;
     return { chords: [], error: error?.message || 'Vision proxy unreachable' };
   }
@@ -380,7 +388,8 @@ async function fallbackClientVision(
   image: string,
   layout: VisionSheetLayout,
   provider: string,
-  clientKey?: string
+  clientKey?: string,
+  keyHint?: string
 ): Promise<VisionChordResult | null> {
   if (!clientKey) return null;
   if (provider === 'gemini') {
@@ -390,7 +399,7 @@ async function fallbackClientVision(
     return { chords: await detectChordsWithOpenAI(image, clientKey) };
   }
   if (provider === 'openrouter') {
-    const direct = await detectChordsWithOpenRouter(image, clientKey, layout);
+    const direct = await detectChordsWithOpenRouter(image, clientKey, layout, keyHint);
     return { chords: direct.chords, model: direct.model };
   }
   return null;

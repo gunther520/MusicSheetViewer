@@ -27,6 +27,16 @@ describe('mergeChordDetections', () => {
     expect(chordSpecificity('C/E')).toBeGreaterThan(chordSpecificity('C'));
   });
 
+  it('uses the song key to prefer Bb over a nearby B7 false read', async () => {
+    const { buildSongKey } = await import('./musicTheory');
+    const fMajor = buildSongKey('F', 'major', 0.8, 'chord-histogram');
+    const ocr = [chord('Bb', 20, 18, 'ocr-1'), chord('F', 50, 18, 'ocr-2')];
+    const vision = [chord('B7', 20.5, 18.2, 'v-1')];
+    const merged = mergeChordDetections(ocr, vision, undefined, fMajor);
+    expect(merged.map((item) => item.originalText)).toContain('Bb');
+    expect(merged.map((item) => item.originalText)).not.toContain('B7');
+  });
+
   it('unions OCR and Vision and prefers the more specific nearby name', () => {
     const ocr = [chord('C', 20, 18, 'ocr-1'), chord('G', 60, 18, 'ocr-2')];
     const vision = [chord('C/E', 20.8, 18.4, 'v-1'), chord('Dm7', 40, 18, 'v-2')];

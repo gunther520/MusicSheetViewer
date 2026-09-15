@@ -1,4 +1,5 @@
 import { ChordPosition } from '../utils/chordUtils';
+import { SongKey, chooseNameInKey } from './musicTheory';
 
 export function chordSpecificity(name: string): number {
   const n = name.trim();
@@ -33,7 +34,8 @@ function inKeepBands(chord: ChordPosition, keepYRangesPct?: Array<{ top: number;
 export function mergeChordDetections(
   ocr: ChordPosition[],
   vision: ChordPosition[],
-  keepYRangesPct?: Array<{ top: number; bottom: number }>
+  keepYRangesPct?: Array<{ top: number; bottom: number }>,
+  songKey?: SongKey | null
 ): ChordPosition[] {
   const merged: ChordPosition[] = ocr.map((chord) => ({ ...chord }));
   const visionKept = vision.filter((chord) => inKeepBands(chord, keepYRangesPct));
@@ -41,11 +43,17 @@ export function mergeChordDetections(
   visionKept.forEach((hit, index) => {
     const match = merged.find((existing) => near(existing, hit));
     if (match) {
-      if (chordSpecificity(hit.originalText) > chordSpecificity(match.originalText)) {
-        match.originalText = hit.originalText;
-        match.currentText = hit.originalText;
-        match.confidence = Math.max(match.confidence ?? 0, hit.confidence ?? 0);
+      const chosen = chooseNameInKey(
+        match.originalText,
+        hit.originalText,
+        songKey || null,
+        chordSpecificity
+      );
+      if (chosen !== match.originalText) {
+        match.originalText = chosen;
+        match.currentText = chosen;
       }
+      match.confidence = Math.max(match.confidence ?? 0, hit.confidence ?? 0);
       return;
     }
     merged.push({
@@ -60,9 +68,15 @@ export function mergeChordDetections(
   merged.forEach((chord) => {
     const prev = deduped[deduped.length - 1];
     if (prev && near(prev, chord, 3.2, 2.8)) {
-      if (chordSpecificity(chord.originalText) > chordSpecificity(prev.originalText)) {
-        prev.originalText = chord.originalText;
-        prev.currentText = chord.originalText;
+      const chosen = chooseNameInKey(
+        prev.originalText,
+        chord.originalText,
+        songKey || null,
+        chordSpecificity
+      );
+      if (chosen !== prev.originalText) {
+        prev.originalText = chosen;
+        prev.currentText = chosen;
       }
       return;
     }
