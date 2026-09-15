@@ -6,9 +6,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react(), detectChordsDevPlugin(env.OPENROUTER_API_KEY || '')],
-    server: {
-      host: true,
-      port: 5173,
+    optimizeDeps: {
+      exclude: ['sharp'],
+    },
+    build: {
+      rollupOptions: {
+        external: ['sharp'],
+      },
     },
   };
 });

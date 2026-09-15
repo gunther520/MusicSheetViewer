@@ -37,9 +37,9 @@ An interactive sheet music application that allows musicians to photograph or up
 - **Full Progression Playback**: "Play All Chords Preview" button plays through the entire piece's chords in sequence.
 
 ### 5. Automatic Chord Detection
-- **Hybrid scan**: Free OpenRouter Vision AI first (`openrouter/free`), then Tesseract OCR if Vision is unavailable.
-- **Staff-aware placement**: Detected chords are snapped onto shared staff chord tracks.
-- **Tesseract.js fallback**: Local in-browser OCR when no Vision key/endpoint is configured.
+- **Hybrid scan**: Layout-aware OCR first (crop the chord band above each staff), then free OpenRouter Vision if OCR finds nothing.
+- **Staff-aware placement**: Chord-band detection from staff-line geometry, not from filenames or known pieces.
+- **Tesseract.js**: Local in-browser OCR on staff chord bands or sparse full-page reads for lyric charts.
 - **Chord Token Filter**: Cleans noise, filters out lyrics, and extracts chord positions.
 
 ### 6. Export & Print

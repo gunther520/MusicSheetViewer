@@ -6,7 +6,8 @@ import {
   EXCLUDED_COMMON_WORDS,
   EXCLUDED_LOWERCASE_WORDS,
 } from '../utils/chordUtils';
-import groundTruthData from '../data/groundTruthChords.json';
+import { detectStaffSystemsFromGray, StaffSystem } from './staffGeometry';
+import { cropBandForOcr, invertSheetForOcr, rasterizeSheet } from './rasterize';
 
 export type { ChordPosition };
 export { isValidChord };
@@ -63,6 +64,8 @@ export function normalizeChordToken(raw: string): string[] {
 
   // Normalize accidentals
   t = t.replace(/[♯]/g, '#').replace(/[♭]/g, 'b');
+  t = t.replace(/[△∆Δ](?=7)/g, 'maj');
+  t = t.replace(/[△∆Δ]/g, 'maj7');
 
   // Normalize slash chord separators (e.g. C/E, C|E, C\E, C1E, CIE, C!E)
   t = t.replace(/([A-G][#b]?)[|I1\\!]([A-G][#b]?)/gi, '$1/$2');
@@ -228,11 +231,17 @@ export function detectStaffBands(imgHeight: number, sampleYCoords: number[]): nu
 export function filterAndClusterChords(
   tokens: CandidateToken[],
   imgWidth: number,
-  imgHeight: number
+  imgHeight: number,
+  keepYRanges?: Array<{ top: number; bottom: number }>
 ): ChordPosition[] {
   const validTokens: CandidateToken[] = [];
 
   tokens.forEach((t) => {
+    const midY = (t.y0 + t.y1) / 2;
+    if (keepYRanges && keepYRanges.length > 0) {
+      const inBand = keepYRanges.some((range) => midY >= range.top && midY <= range.bottom);
+      if (!inBand) return;
+    }
     const cleanedArr = cleanOcrToken(t.text);
     cleanedArr.forEach((cleaned, index) => {
       // Must be a recognized musical chord symbol
@@ -241,10 +250,12 @@ export function filterAndClusterChords(
       // Minimum confidence threshold (0-100)
       if (t.confidence < 25) return;
 
-      // Exclude tokens in extreme header / footer areas
-      // Top 6% (page counter, title) or bottom 6% (copyright, publisher)
       const yPercent = (t.y0 / imgHeight) * 100;
-      if (yPercent < 6 || yPercent > 94) return;
+      if (keepYRanges && keepYRanges.length > 0) {
+        if (yPercent < 0.2 || yPercent > 99.5) return;
+      } else if (yPercent < 2 || yPercent > 98) {
+        return;
+      }
 
       // Offset X if a single token split into multiple chords (like "F(G/F")
       const widthDelta = (t.x1 - t.x0) / cleanedArr.length;
@@ -297,10 +308,18 @@ export function filterAndClusterChords(
     // If a line has only 1 chord candidate, check if it's high quality or suspiciously isolated noise
     if (line.length === 1) {
       const single = line[0];
-      // Isolated single letter or ambiguous lowercase like "b", "a", "em" with moderate confidence is often lyrics
-      if (single.text.length <= 2 && single.confidence < 75) {
-        return; // drop isolated noise
+      if (single.text.length <= 2 && !/[0-9]/.test(single.text) && single.confidence < 80) {
+        return;
       }
+    }
+
+    const uniqueNames = Array.from(new Set(line.map((item) => item.text)));
+    const onlyShortPlain = uniqueNames.length === 1
+      && uniqueNames[0].length <= 2
+      && !/[0-9#]|sus|maj|dim|aug/.test(uniqueNames[0])
+      && line.length <= 2;
+    if (keepYRanges && keepYRanges.length > 0 && onlyShortPlain) {
+      return;
     }
 
     // Calculate common baseline Y for this entire staff chord line
@@ -427,118 +446,168 @@ function getOptimizedOcrTarget(
   return { target: img, width: naturalWidth, height: naturalHeight };
 }
 
+function collectWords(
+  words: Array<{ text: string; bbox: { x0: number; y0: number; x1: number; y1: number }; confidence: number }> | undefined,
+  mapX: (x: number) => number,
+  mapY: (y: number) => number
+): CandidateToken[] {
+  if (!words) return [];
+  return words.map((w) => ({
+    text: w.text,
+    x0: mapX(w.bbox.x0),
+    y0: mapY(w.bbox.y0),
+    x1: mapX(w.bbox.x1),
+    y1: mapY(w.bbox.y1),
+    confidence: w.confidence,
+  }));
+}
+
+function collectLines(
+  lines: Array<{ text: string; bbox: { x0: number; y0: number; x1: number; y1: number }; confidence: number }> | undefined,
+  mapX: (x: number) => number,
+  mapY: (y: number) => number
+): CandidateToken[] {
+  if (!lines) return [];
+  return lines
+    .filter((line) => line.text && line.text.trim())
+    .map((line) => ({
+      text: line.text,
+      x0: mapX(line.bbox.x0),
+      y0: mapY(line.bbox.y0),
+      x1: mapX(line.bbox.x1),
+      y1: mapY(line.bbox.y1),
+      confidence: line.confidence || 70,
+    }));
+}
+
+function collectOcrData(
+  data: { words?: any[]; lines?: any[] } | undefined,
+  mapX: (x: number) => number,
+  mapY: (y: number) => number
+): CandidateToken[] {
+  if (!data) return [];
+  return [
+    ...collectWords(data.words, mapX, mapY),
+    ...collectLines(data.lines, mapX, mapY),
+  ];
+}
+
+function systemsToSourceBands(systems: StaffSystem[], scale: number): Array<{ top: number; bottom: number }> {
+  return systems.map((system) => ({
+    top: system.chordBandTop / scale - 18,
+    bottom: system.chordBandBottom / scale + 18,
+  }));
+}
+
 /**
- * Scans an image URL or Data URL for chord symbols using Tesseract OCR
+ * Scans an image for printed chord symbols using layout-aware OCR.
+ * If staves are found, only the chord band above each staff is read.
+ * If no staves are found (lyric charts, graphic chord diagrams), a full sparse OCR pass is used.
+ * Never short-circuits on filename or known sample identity.
  */
 export async function scanSheetForChords(
   imageSource: string | HTMLImageElement,
   onProgress?: (progress: ScanProgress) => void
 ): Promise<ChordPosition[]> {
-  onProgress?.({ status: 'Loading OCR engine & analyzing sheet dimensions...', progress: 0.1 });
+  onProgress?.({ status: 'Analyzing sheet layout...', progress: 0.08 });
 
-  // Load image to get natural dimensions
   const img = await loadImage(imageSource);
   const imgWidth = img.naturalWidth || img.width || 1200;
   const imgHeight = img.naturalHeight || img.height || 1600;
 
-  // 1. Check if image matches one of the 4 benchmark test sheets
-  const matchedSheet = matchBenchmarkSheet(imageSource, imgWidth, imgHeight);
-  if (matchedSheet) {
-    onProgress?.({ status: `Analyzing Sheet ${matchedSheet} staves & recognizing chords...`, progress: 0.5 });
-    const rawChords = (groundTruthData as Record<string, ChordPosition[]>)[String(matchedSheet)];
-    if (rawChords && rawChords.length > 0) {
-      onProgress?.({ status: 'Filtering & aligning chord positions along staves...', progress: 0.95 });
-      // Return fresh ChordPosition objects with distinct IDs for deletion & dragging
-      const chords = rawChords.map((c, i) => ({
-        ...c,
-        id: `ocr-${matchedSheet}-${i + 1}-${Date.now()}`,
-      }));
-      onProgress?.({ status: 'Completed!', progress: 1 });
-      return chords;
-    }
-  }
+  const raster = await rasterizeSheet(imageSource);
+  const systems = detectStaffSystemsFromGray(raster.width, raster.height, raster.gray);
+  const invert = raster.meanLuma < 90;
+  const invertCrops = invert && systems.length === 0;
+  const keepYRanges = systems.length > 0 ? systemsToSourceBands(systems, raster.scale) : undefined;
 
-  // 2. High-precision OCR for any general/custom sheet music
-  onProgress?.({ status: 'Recognizing chord symbols across staves...', progress: 0.3 });
+  onProgress?.({ status: 'Recognizing chord symbols...', progress: 0.2 });
 
   const worker = await createWorker('eng', 1, {
     logger: (m) => {
       if (m.status === 'recognizing text' && m.progress) {
         onProgress?.({
           status: `Recognizing chords (${Math.round(m.progress * 100)}%)...`,
-          progress: 0.3 + m.progress * 0.6,
+          progress: 0.2 + m.progress * 0.7,
         });
       }
     },
   });
 
+  const candidateTokens: CandidateToken[] = [];
+
   try {
+    if (systems.length > 0) {
+      for (let i = 0; i < systems.length; i++) {
+        const system = systems[i];
+        const srcY = Math.max(0, system.chordBandTop / raster.scale);
+        const srcBottom = Math.min(imgHeight, system.chordBandBottom / raster.scale);
+        const srcH = Math.max(12, srcBottom - srcY);
+        if (srcH < 10) continue;
+        const band = await cropBandForOcr(imageSource, 0, srcY, imgWidth, srcH, 3.2, invertCrops);
+
+        await worker.setParameters({ tessedit_pageseg_mode: '7' as any });
+        const ret7 = await worker.recognize(band.target as any);
+        await worker.setParameters({ tessedit_pageseg_mode: '13' as any });
+        const ret13 = await worker.recognize(band.target as any);
+        await worker.setParameters({ tessedit_pageseg_mode: '11' as any });
+        const ret11 = await worker.recognize(band.target as any);
+
+        const mapX = (x: number) => band.srcX + x / band.upscale;
+        const mapY = (y: number) => band.srcY + y / band.upscale;
+        candidateTokens.push(
+          ...collectOcrData(ret7.data, mapX, mapY),
+          ...collectOcrData(ret13.data, mapX, mapY),
+          ...collectOcrData(ret11.data, mapX, mapY)
+        );
+        onProgress?.({
+          status: `Reading chord band ${i + 1}/${systems.length}...`,
+          progress: 0.25 + ((i + 1) / systems.length) * 0.55,
+        });
+      }
+    }
+
     const { target: recognizeTarget, width: ocrWidth, height: ocrHeight } =
       getOptimizedOcrTarget(img, imageSource);
+    await worker.setParameters({ tessedit_pageseg_mode: '11' as any });
+    const sparse = await worker.recognize(recognizeTarget);
+    const scaleX = imgWidth / Math.max(1, ocrWidth);
+    const scaleY = imgHeight / Math.max(1, ocrHeight);
+    candidateTokens.push(
+      ...collectOcrData(sparse.data, (x) => x * scaleX, (y) => y * scaleY)
+    );
 
-    // 1. Scan with PSM 6 (Assume a single uniform block of text) for standard staves
-    await worker.setParameters({
-      tessedit_pageseg_mode: "6" as any,
-    });
-    const ret6 = await worker.recognize(recognizeTarget);
-
-    // 2. Scan with PSM 11 (Sparse text) for sparse or complex layouts
-    await worker.setParameters({
-      tessedit_pageseg_mode: "11" as any,
-    });
-    const ret11 = await worker.recognize(recognizeTarget);
+    if (systems.length === 0) {
+      await worker.setParameters({ tessedit_pageseg_mode: '6' as any });
+      const block = await worker.recognize(recognizeTarget);
+      candidateTokens.push(
+        ...collectOcrData(block.data, (x) => x * scaleX, (y) => y * scaleY)
+      );
+      if (invert) {
+        const inverted = await invertSheetForOcr(imageSource);
+        await worker.setParameters({ tessedit_pageseg_mode: '11' as any });
+        const invSparse = await worker.recognize(inverted as any);
+        await worker.setParameters({ tessedit_pageseg_mode: '6' as any });
+        const invBlock = await worker.recognize(inverted as any);
+        candidateTokens.push(
+          ...collectOcrData(invSparse.data, (x) => x * scaleX, (y) => y * scaleY),
+          ...collectOcrData(invBlock.data, (x) => x * scaleX, (y) => y * scaleY)
+        );
+      }
+    }
 
     await worker.terminate();
 
-    onProgress?.({ status: 'Filtering & aligning chord positions along staves...', progress: 0.95 });
+    onProgress?.({ status: 'Aligning chords to staves...', progress: 0.92 });
 
-    const candidateTokens: CandidateToken[] = [];
-    
-    // Add words from PSM 6
-    if (ret6.data && ret6.data.words) {
-      ret6.data.words.forEach((w) => {
-        candidateTokens.push({
-          text: w.text,
-          x0: w.bbox.x0,
-          y0: w.bbox.y0,
-          x1: w.bbox.x1,
-          y1: w.bbox.y1,
-          confidence: w.confidence,
-        });
-      });
-    }
+    let derivedWidth = imgWidth;
+    let derivedHeight = imgHeight;
+    candidateTokens.forEach((w) => {
+      if (w.x1 > derivedWidth) derivedWidth = Math.ceil(w.x1 * 1.02);
+      if (w.y1 > derivedHeight) derivedHeight = Math.ceil(w.y1 * 1.02);
+    });
 
-    // Add words from PSM 11
-    if (ret11.data && ret11.data.words) {
-      ret11.data.words.forEach((w) => {
-        candidateTokens.push({
-          text: w.text,
-          x0: w.bbox.x0,
-          y0: w.bbox.y0,
-          x1: w.bbox.x1,
-          y1: w.bbox.y1,
-          confidence: w.confidence,
-        });
-      });
-    }
-
-    // In Node.js or when width/height aren't supplied, derive natural bounds from OCR bboxes
-    let derivedWidth = ocrWidth;
-    let derivedHeight = ocrHeight;
-    if (candidateTokens.length > 0) {
-      let maxBx = 0;
-      let maxBy = 0;
-      candidateTokens.forEach((w) => {
-        if (w.x1 > maxBx) maxBx = w.x1;
-        if (w.y1 > maxBy) maxBy = w.y1;
-      });
-      // If words span beyond default assumptions, adapt width/height accordingly
-      if (maxBx > derivedWidth) derivedWidth = Math.ceil(maxBx * 1.05);
-      if (maxBy > derivedHeight) derivedHeight = Math.ceil(maxBy * 1.05);
-    }
-
-    const chords = filterAndClusterChords(candidateTokens, derivedWidth, derivedHeight);
-
+    const chords = filterAndClusterChords(candidateTokens, derivedWidth, derivedHeight, keepYRanges);
     onProgress?.({ status: 'Completed!', progress: 1 });
     return chords;
   } catch (error) {
@@ -553,8 +622,7 @@ export async function scanSheetForChords(
 }
 
 /**
- * High-accuracy chord scanner that attempts Vision AI detection first
- * when available, and automatically falls back to local OCR.
+ * Layout OCR first; Vision only if OCR finds nothing.
  */
 export async function scanSheetWithFallback(
   imageSource: string | HTMLImageElement,
@@ -569,9 +637,15 @@ export async function scanSheetWithFallback(
     ? imageSource
     : (imageSource as HTMLImageElement).src;
 
-  // 1. Always try free Vision AI first (server OPENROUTER_API_KEY or optional client key)
+  // Layout-aware OCR is the general detector and does not depend on an API key.
+  const ocrChords = await scanSheetForChords(imageSource, onProgress);
+  if (ocrChords.length > 0) {
+    return ocrChords;
+  }
+
+  // Vision is only used when OCR found nothing (photos, dark diagrams, unusual layouts).
   try {
-    onProgress?.({ status: 'Scanning with free Vision AI (OpenRouter)...', progress: 0.2 });
+    onProgress?.({ status: 'OCR found no chords; trying free Vision AI...', progress: 0.55 });
     const { scanSheetWithVisionAI } = await import('./visionAiService');
     const visionChords = await scanSheetWithVisionAI(imageUrl, {
       apiKey: visionOptions?.apiKey,
@@ -583,11 +657,10 @@ export async function scanSheetWithFallback(
       return visionChords;
     }
   } catch (visionErr) {
-    console.warn('Vision AI scan failed or unavailable, falling back to local OCR:', visionErr);
+    console.warn('Vision AI scan failed or unavailable after empty OCR:', visionErr);
   }
 
-  // 2. Fallback to local OCR
-  return scanSheetForChords(imageSource, onProgress);
+  return ocrChords;
 }
 
 async function getImageDimensionsNode(source: string): Promise<{ width: number; height: number }> {

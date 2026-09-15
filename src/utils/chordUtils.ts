@@ -86,7 +86,8 @@ export function normalizeAccidentals(str: string): string {
     .replace(/♯/g, '#')
     .replace(/♭/g, 'b')
     .replace(/ø|Ø/g, 'm7b5')
-    .replace(/Δ/g, 'maj7')
+    .replace(/[△∆Δ](?=7)/g, 'maj')
+    .replace(/[△∆Δ]/g, 'maj7')
     .replace(/°/g, 'dim')
     .trim();
 }

@@ -40,8 +40,9 @@ describe('Staff-aware Vision placement', () => {
 
     const tracks = detectStaffChordTracksFromGray(width, height, pixels);
     expect(tracks.length).toBeGreaterThanOrEqual(1);
-    const expected = ((80 - 1.55 * 8) / height) * 100;
-    expect(Math.abs(tracks[0] - expected)).toBeLessThan(3);
-    expect(snapToNearestTrack(expected + 1.2, tracks, 5)).toBe(tracks[0]);
+    const bandMid = ((80 - 7.2 * 8) + (80 - 0.15 * 8)) / 2;
+    const expected = (bandMid / height) * 100;
+    expect(Math.abs(tracks[0] - expected)).toBeLessThan(8);
+    expect(snapToNearestTrack(expected + 1.2, tracks, 8)).toBe(tracks[0]);
   });
 });

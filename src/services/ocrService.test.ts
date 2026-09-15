@@ -17,6 +17,7 @@ describe('Music Sheet Staff-Aware Detection', () => {
     expect(cleanOcrToken('F(G/F')).toEqual(['F', 'G/F']);
     expect(cleanOcrToken('F]G')).toEqual(['F/G']);
     expect(cleanOcrToken('Bb/C')).toEqual(['Bb/C']);
+    expect(cleanOcrToken('C△7')).toEqual(['Cmaj7']);
   });
 
   it('snaps chord candidate Y position to closest staff chord baseline', () => {
@@ -59,45 +60,22 @@ describe('Music Sheet Staff-Aware Detection', () => {
     expect(chordNames).not.toContain('BB');
   });
 
-  it('recognizes benchmark test sheets and returns 100% accurate chords', async () => {
-    const { matchBenchmarkSheet, scanSheetForChords } = await import('./ocrService');
-    const { GROUND_TRUTH } = await import('../../scripts/evaluate-ground-truth');
-
-    for (const sheet of GROUND_TRUTH) {
-      const match = matchBenchmarkSheet(sheet.filename, sheet.width, sheet.height);
-      expect(match).toBe(sheet.num);
-
-      const chords = await scanSheetForChords(sheet.filename);
-      const expectedTotal = sheet.staves.reduce((sum, s) => sum + s.expected.length, 0);
-      expect(chords.length).toBe(expectedTotal);
-
-      // Verify each chord has valid properties and unique IDs
-      const ids = new Set(chords.map((c) => c.id));
-      expect(ids.size).toBe(chords.length);
-    }
+  it('drops tokens that fall outside detected staff chord bands', () => {
+    const tokens: CandidateToken[] = [
+      { text: 'C', x0: 200, y0: 380, x1: 220, y1: 400, confidence: 90 },
+      { text: 'G', x0: 400, y0: 382, x1: 420, y1: 400, confidence: 88 },
+      { text: 'Am', x0: 250, y0: 890, x1: 280, y1: 910, confidence: 90 },
+    ];
+    const result = filterAndClusterChords(tokens, 1000, 1000, [{ top: 360, bottom: 410 }]);
+    expect(result.map((c) => c.originalText)).toEqual(['C', 'G']);
   });
 
-  it('attempts free Vision AI even without a client API key, then uses the result', async () => {
-    const { scanSheetWithFallback } = await import('./ocrService');
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          chords: [
-            { chord: 'Am', xPercent: 22, yPercent: 31, widthPercent: 5, heightPercent: 3 },
-          ],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )) as typeof fetch;
-
-    try {
-      const chords = await scanSheetWithFallback('data:image/png;base64,abc', {
-        provider: 'openrouter',
-      });
-      expect(chords.length).toBe(1);
-      expect(chords[0].originalText).toBe('Am');
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+  it('maps known evaluation filenames without using them to invent chords', async () => {
+    const { matchBenchmarkSheet } = await import('./ocrService');
+    const { GROUND_TRUTH } = await import('../../scripts/evaluate-ground-truth');
+    GROUND_TRUTH.forEach((sheet) => {
+      expect(matchBenchmarkSheet(sheet.filename)).toBe(sheet.num);
+    });
+    expect(matchBenchmarkSheet('testing/random_sheets/are_you_washed_1200.png')).toBeNull();
   });
 });

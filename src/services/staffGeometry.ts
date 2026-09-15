@@ -58,26 +58,51 @@ export function alignChordsToStaffTracks(chords: ChordPosition[], maxDistancePct
   }));
 }
 
+export interface StaffSystem {
+  staffTop: number;
+  staffBottom: number;
+  lineSpacing: number;
+  chordBandTop: number;
+  chordBandBottom: number;
+  isGrandStaff: boolean;
+}
+
 /**
- * Detect chord-track Y percentages from a grayscale raster via horizontal ink projection.
- * Staff lines are thin dark rows; chord symbols sit ~1.5 line-spacings above each 5-line staff.
+ * Detect musical staff systems and the chord-symbol band sitting above each staff.
+ * Layout-based only: horizontal ink projection + regularly spaced 5-line groups.
+ * Works on any engraved/printed lead sheet; does not use filenames or known pieces.
  */
-export function detectStaffChordTracksFromGray(
+export function detectStaffSystemsFromGray(
   width: number,
   height: number,
   pixels: Uint8Array,
-  inkThreshold = 90
-): number[] {
-  if (width < 16 || height < 16) return [];
+  inkThreshold?: number
+): StaffSystem[] {
+  if (width < 32 || height < 32) return [];
 
+  const threshold = inkThreshold ?? estimateInkThreshold(pixels);
   const rowDark = new Float64Array(height);
+  const rowLine = new Float64Array(height);
+  const x0 = Math.floor(width * 0.08);
+  const x1 = Math.ceil(width * 0.92);
+  const span = Math.max(1, x1 - x0);
+
   for (let y = 0; y < height; y++) {
     let dark = 0;
+    let longest = 0;
+    let run = 0;
     const rowStart = y * width;
-    for (let x = 0; x < width; x++) {
-      if (pixels[rowStart + x] < inkThreshold) dark += 1;
+    for (let x = x0; x < x1; x++) {
+      if (pixels[rowStart + x] < threshold) {
+        dark += 1;
+        run += 1;
+        if (run > longest) longest = run;
+      } else {
+        run = 0;
+      }
     }
-    rowDark[y] = dark / width;
+    rowDark[y] = dark / span;
+    rowLine[y] = longest / span;
   }
 
   const smoothed = new Float64Array(height);
@@ -87,7 +112,7 @@ export function detectStaffChordTracksFromGray(
     for (let k = -1; k <= 1; k++) {
       const yy = y + k;
       if (yy >= 0 && yy < height) {
-        sum += rowDark[yy];
+        sum += rowLine[yy] * 0.7 + rowDark[yy] * 0.3;
         count += 1;
       }
     }
@@ -96,7 +121,8 @@ export function detectStaffChordTracksFromGray(
 
   const sorted = Array.from(smoothed).sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] || 0;
-  const peakFloor = Math.max(0.06, median * 3);
+  const p90 = sorted[Math.floor(sorted.length * 0.9)] || 0;
+  const peakFloor = Math.max(0.1, median * 3.2, p90 * 0.5);
 
   const rawPeaks: Array<{ y: number; val: number }> = [];
   for (let y = 1; y < height - 1; y++) {
@@ -119,7 +145,7 @@ export function detectStaffChordTracksFromGray(
 
   if (peaks.length < 5) return [];
 
-  const tracksPct: number[] = [];
+  const fiveLineStaves: Array<{ top: number; bottom: number; spacing: number }> = [];
   for (let i = 0; i <= peaks.length - 5; i++) {
     const group = peaks.slice(i, i + 5);
     const spacings = [
@@ -129,21 +155,81 @@ export function detectStaffChordTracksFromGray(
       group[4] - group[3],
     ];
     const mean = spacings.reduce((sum, val) => sum + val, 0) / spacings.length;
-    if (mean < 2 || mean > height * 0.08) continue;
+    if (mean < 3 || mean > Math.max(16, height * 0.07)) continue;
     const variance = spacings.reduce((sum, val) => sum + (val - mean) ** 2, 0) / spacings.length;
     const cv = Math.sqrt(variance) / mean;
-    if (cv > 0.28) continue;
+    if (cv > 0.22) continue;
 
-    const staffTop = group[0];
-    const chordTrack = staffTop - 1.55 * mean;
-    const pct = (Math.max(0, chordTrack) / height) * 100;
-    const prev = tracksPct[tracksPct.length - 1];
-    if (prev === undefined || Math.abs(pct - prev) > 3) {
-      tracksPct.push(pct);
-    }
+    const top = group[0];
+    const bottom = group[4];
+    const prev = fiveLineStaves[fiveLineStaves.length - 1];
+    if (prev && Math.abs(top - prev.top) < mean * 2) continue;
+    fiveLineStaves.push({ top, bottom, spacing: mean });
   }
 
-  return tracksPct;
+  if (fiveLineStaves.length === 0) return [];
+
+  const systems: StaffSystem[] = [];
+  for (let i = 0; i < fiveLineStaves.length; i++) {
+    const staff = fiveLineStaves[i];
+    const next = fiveLineStaves[i + 1];
+    const prevSystem = systems[systems.length - 1];
+    const staffHeight = staff.bottom - staff.top;
+    const gapToNext = next ? next.top - staff.bottom : Infinity;
+    const isGrandPair = Boolean(
+      next && gapToNext > staff.spacing * 1.2 && gapToNext < staffHeight * 1.8
+    );
+
+    if (prevSystem && staff.top < prevSystem.staffBottom + staffHeight * 0.4) {
+      continue;
+    }
+
+    const chordBandBottom = Math.max(0, staff.top - Math.round(staff.spacing * 0.15));
+    const chordBandTop = Math.max(
+      0,
+      staff.top - Math.max(Math.round(staff.spacing * 7.2), 24)
+    );
+    const limitedTop = prevSystem
+      ? Math.max(chordBandTop, prevSystem.staffBottom + Math.round(staff.spacing * 0.4))
+      : chordBandTop;
+
+    systems.push({
+      staffTop: staff.top,
+      staffBottom: isGrandPair && next ? next.bottom : staff.bottom,
+      lineSpacing: staff.spacing,
+      chordBandTop: limitedTop,
+      chordBandBottom: Math.max(limitedTop + 4, chordBandBottom),
+      isGrandStaff: isGrandPair,
+    });
+
+    if (isGrandPair) i += 1;
+  }
+
+  return systems;
+}
+
+function estimateInkThreshold(pixels: Uint8Array): number {
+  let sum = 0;
+  const step = Math.max(1, Math.floor(pixels.length / 8000));
+  let count = 0;
+  for (let i = 0; i < pixels.length; i += step) {
+    sum += pixels[i];
+    count += 1;
+  }
+  const mean = count ? sum / count : 128;
+  return mean < 90 ? 160 : Math.max(70, Math.min(140, mean - 45));
+}
+
+export function detectStaffChordTracksFromGray(
+  width: number,
+  height: number,
+  pixels: Uint8Array,
+  inkThreshold?: number
+): number[] {
+  return detectStaffSystemsFromGray(width, height, pixels, inkThreshold).map((system) => {
+    const y = (system.chordBandTop + system.chordBandBottom) / 2;
+    return (y / height) * 100;
+  });
 }
 
 export function snapChordsToStaffTracks(
