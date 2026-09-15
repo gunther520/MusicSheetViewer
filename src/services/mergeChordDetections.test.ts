@@ -4,6 +4,7 @@ import {
   chordSpecificity,
   mapMontageChordsToPage,
   mergeChordDetections,
+  placeVisionOnStaffBands,
 } from './mergeChordDetections';
 
 function chord(text: string, x: number, y: number, id = text): ChordPosition {
@@ -62,5 +63,37 @@ describe('mergeChordDetections', () => {
     expect(mapped[0].originalText).toBe('Fm7');
     expect(mapped[0].x).toBe(30);
     expect(mapped[0].y).toBeCloseTo((80 + 0.5 * 40) / 2000 * 100, 1);
+  });
+
+  it('uses labeled strip numbers and remaps x after a left gutter', () => {
+    const mapped = mapMontageChordsToPage(
+      [{ ...chord('C7', 28, 90, 'v-1'), strip: 2 }],
+      {
+        width: 1100,
+        height: 200,
+        sourceWidth: 1000,
+        sourceHeight: 2000,
+        gutterWidth: 100,
+        slices: [
+          { montageY0: 0, montageY1: 100, srcY: 80, srcH: 40 },
+          { montageY0: 108, montageY1: 200, srcY: 400, srcH: 40 },
+        ],
+      }
+    );
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0].originalText).toBe('C7');
+    expect(mapped[0].x).toBeCloseTo(((28 / 100) * 1100 - 100) / 1000 * 100, 1);
+    expect(mapped[0].y).toBeCloseTo((400 + 0.55 * 40) / 2000 * 100, 1);
+    expect(mapped[0].strip).toBeUndefined();
+  });
+
+  it('snaps Vision hits onto staff bands and drops far lyric false adds', () => {
+    const placed = placeVisionOnStaffBands(
+      [chord('C', 20, 19, 'v-1'), chord('Am', 40, 81, 'v-2')],
+      [{ top: 16, bottom: 24 }]
+    );
+    expect(placed).toHaveLength(1);
+    expect(placed[0].originalText).toBe('C');
+    expect(placed[0].y).toBe(20);
   });
 });

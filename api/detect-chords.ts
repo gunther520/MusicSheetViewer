@@ -4,6 +4,8 @@
  * Supports both Web Request handlers and Node (req, res) runtimes.
  */
 
+import { resolveVisionPrompts } from '../src/services/visionPrompt';
+
 export const config = {
   runtime: 'nodejs',
   maxDuration: 60,
@@ -19,16 +21,6 @@ const FREE_MODELS = [
   'inclusionai/ling-3.0-flash-vl:free',
   'openrouter/free',
 ] as const;
-
-const FULL_SHEET_PROMPT = `You are an expert music notation and lead-sheet reader.
-Detect EVERY printed chord symbol in this image. Do not invent chords that are not printed.
-Return ONLY JSON: {"chords":[{"chord":"string","xPercent":number,"yPercent":number,"widthPercent":number,"heightPercent":number}]}
-If there are no printed chord symbols, return {"chords":[]}.`;
-
-const BAND_PROMPT = `You are an expert lead-sheet chord reader.
-This image is a VERTICAL STACK of cropped strips from the chord-symbol band above each staff.
-Return ONLY JSON: {"chords":[{"chord":"string","xPercent":number,"yPercent":number,"widthPercent":number,"heightPercent":number}]}
-If a strip has no chord symbols, contribute nothing. If none, return {"chords":[]}.`;
 
 type JsonBody = {
   image?: string;
@@ -88,10 +80,9 @@ async function completeFreeVision(image: string, apiKey: string, layout: string)
   const imageUrl = image.startsWith('http') || image.startsWith('data:')
     ? image
     : `data:image/jpeg;base64,${image}`;
-  const system = layout === 'staff-bands' ? BAND_PROMPT : FULL_SHEET_PROMPT;
-  const user = layout === 'staff-bands'
-    ? 'These stacked strips are chord-symbol bands. List every printed chord. If none, return {"chords":[]}.'
-    : 'Detect every printed chord symbol on this sheet. If none, return {"chords":[]}.';
+  const prompts = resolveVisionPrompts(layout === 'staff-bands' ? 'staff-bands' : 'full-sheet');
+  const system = prompts.system;
+  const user = prompts.user;
 
   let lastError = 'OpenRouter free-model request failed';
   let emptyModel: string | undefined;
@@ -117,8 +108,8 @@ async function completeFreeVision(image: string, apiKey: string, layout: string)
             ],
           },
         ],
-        temperature: 0.1,
-        max_tokens: 4000,
+        temperature: 0,
+        max_tokens: 8000,
       }),
     });
 

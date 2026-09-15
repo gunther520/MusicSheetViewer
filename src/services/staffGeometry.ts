@@ -189,7 +189,7 @@ export function detectStaffSystemsFromGray(
     const chordBandBottom = Math.max(0, staff.top - Math.round(staff.spacing * 0.15));
     const chordBandTop = Math.max(
       0,
-      staff.top - Math.max(Math.round(staff.spacing * 7.2), 24)
+      staff.top - Math.max(Math.round(staff.spacing * 8.6), 28)
     );
     const limitedTop = prevSystem
       ? Math.max(chordBandTop, prevSystem.staffBottom + Math.round(staff.spacing * 0.4))
@@ -340,7 +340,7 @@ export function systemsWithSymbolInk(
 export function staffSystemsToKeepYRangesPct(
   systems: StaffSystem[],
   rasterHeight: number,
-  padPct = 1.8
+  padPct = 2.4
 ): Array<{ top: number; bottom: number }> {
   if (rasterHeight <= 0) return [];
   return systems.map((system) => ({

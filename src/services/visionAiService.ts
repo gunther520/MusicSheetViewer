@@ -6,7 +6,7 @@ import {
 } from './openRouterClient';
 import { alignChordsToStaffTracks, detectStaffTracksFromDataUrl, snapChordsToStaffTracks, StaffSystem } from './staffGeometry';
 import { buildChordBandMontage, GrayRaster, sheetToDataUrl } from './rasterize';
-import { mapMontageChordsToPage } from './mergeChordDetections';
+import { mapMontageChordsToPage, mergeChordDetections } from './mergeChordDetections';
 import {
   resolveVisionPrompts,
   VISION_DETECTION_SYSTEM_PROMPT,
@@ -68,6 +68,8 @@ export function parseVisionChordsResponse(
     const y = Math.max(0, Math.min(98, Number(item.yPercent) || 0));
     const width = Math.max(3, Math.min(15, Number(item.widthPercent) || 5));
     const height = Math.max(2, Math.min(8, Number(item.heightPercent) || 3));
+    const stripRaw = Number(item.strip ?? item.stripIndex ?? item.band);
+    const strip = Number.isFinite(stripRaw) && stripRaw >= 1 ? Math.round(stripRaw) : undefined;
 
     validChords.push({
       id: `vision-${idCounter++}-${Date.now()}`,
@@ -78,6 +80,7 @@ export function parseVisionChordsResponse(
       width,
       height,
       confidence: 0.98,
+      ...(strip ? { strip } : {}),
     });
   });
 
@@ -93,7 +96,7 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-function downscaleDataUrl(dataUrl: string, maxDim = 1600): Promise<string> {
+function downscaleDataUrl(dataUrl: string, maxDim = 2048): Promise<string> {
   if (typeof document === 'undefined' || typeof Image === 'undefined') {
     return Promise.resolve(dataUrl);
   }
@@ -120,14 +123,14 @@ function downscaleDataUrl(dataUrl: string, maxDim = 1600): Promise<string> {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
   });
 }
 
-export async function prepareSheetImageForVision(source: string, maxDim = 1600): Promise<string> {
+export async function prepareSheetImageForVision(source: string, maxDim = 2048): Promise<string> {
   let dataUrl = source;
   if (!source.startsWith('data:')) {
     try {
@@ -398,17 +401,31 @@ export function systemsToMontageSlices(
   raster: GrayRaster
 ): Array<{ srcY: number; srcH: number }> {
   return systems.map((system) => {
-    const srcY = Math.max(0, system.chordBandTop / raster.scale);
-    const srcBottom = Math.min(raster.sourceHeight, system.chordBandBottom / raster.scale);
+    const pad = Math.max(6, system.lineSpacing / raster.scale * 0.35);
+    const srcY = Math.max(0, system.chordBandTop / raster.scale - pad);
+    const srcBottom = Math.min(raster.sourceHeight, system.chordBandBottom / raster.scale + pad);
     return {
       srcY,
-      srcH: Math.max(12, srcBottom - srcY),
+      srcH: Math.max(16, srcBottom - srcY),
     };
   });
 }
 
+function chunkItems<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function pause(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Layout-aware Vision: staff-band montage when staves exist, otherwise full page.
+ * Layout-aware Vision: labeled staff-band montage when staves exist, otherwise full page.
  * Uses only free OpenRouter models (or an explicit paid provider the user chose).
  */
 export async function detectChordsWithSheetLayout(
@@ -429,33 +446,51 @@ export async function detectChordsWithSheetLayout(
   );
 
   if (options.systems.length > 0) {
-    const montage = await buildChordBandMontage(
-      imageSource,
-      systemsToMontageSlices(options.systems, options.raster),
-      options.raster.sourceWidth,
-      options.raster.sourceHeight,
-      invert
-    );
-    if (montage) {
+    const allSlices = systemsToMontageSlices(options.systems, options.raster);
+    const groups = chunkItems(allSlices, 4);
+    const mapped: ChordPosition[] = [];
+    let model: string | undefined;
+    let error: string | undefined;
+
+    for (let g = 0; g < groups.length; g++) {
+      const montage = await buildChordBandMontage(
+        imageSource,
+        groups[g],
+        options.raster.sourceWidth,
+        options.raster.sourceHeight,
+        invert
+      );
+      if (!montage) continue;
       try {
         const parsed = await requestVisionChords(montage.dataUrl, 'staff-bands', options);
-        const mapped = mapMontageChordsToPage(parsed.chords, montage);
-        if (mapped.length > 0) return { ...parsed, chords: mapped };
-        if (parsed.error && !parsed.chords.length) {
-          // still try full page
-        } else if (parsed.model && parsed.chords.length === 0) {
-          // model ran, empty bands — try full page next
-        }
-      } catch (error) {
-        console.warn('Staff-band Vision failed; trying full-sheet free Vision:', error);
+        mapped.push(...mapMontageChordsToPage(parsed.chords, montage));
+        if (parsed.model) model = parsed.model;
+        if (parsed.error) error = parsed.error;
+      } catch (montageError) {
+        console.warn('Staff-band Vision failed; trying remaining passes:', montageError);
+      }
+      if (g < groups.length - 1) await pause(400);
+    }
+
+    const sparse = mapped.length < Math.max(4, options.systems.length * 2);
+    if (sparse) {
+      try {
+        if (mapped.length > 0) await pause(400);
+        const full = await requestVisionChords(fullPage, 'full-sheet', options);
+        const combined = mergeChordDetections(mapped, full.chords || []);
+        return {
+          chords: combined,
+          model: full.model || model,
+          error: full.error || error,
+        };
+      } catch (fullError: any) {
+        console.warn('Full-sheet Vision failed after staff-band pass:', fullError);
+        if (mapped.length > 0) return { chords: mapped, model, error };
+        return { chords: [], error: fullError?.message || 'Vision AI failed' };
       }
     }
-    try {
-      return await requestVisionChords(fullPage, 'full-sheet', options);
-    } catch (error: any) {
-      console.warn('Full-sheet Vision failed after staff-band pass:', error);
-      return { chords: [], error: error?.message || 'Vision AI failed' };
-    }
+
+    return { chords: mapped, model, error };
   }
 
   const parsed = await requestVisionChords(fullPage, 'full-sheet', options);

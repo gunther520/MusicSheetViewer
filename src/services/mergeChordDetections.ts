@@ -82,6 +82,39 @@ export interface ChordBandMontageLike {
   sourceWidth: number;
   sourceHeight: number;
   slices: MontageSlice[];
+  gutterWidth?: number;
+}
+
+function montageSliceForChord(
+  chord: ChordPosition,
+  montage: ChordBandMontageLike,
+  yPx: number
+): MontageSlice | undefined {
+  const strip = Number(chord.strip);
+  if (Number.isFinite(strip) && strip >= 1 && strip <= montage.slices.length) {
+    return montage.slices[Math.round(strip) - 1];
+  }
+  let slice = montage.slices.find(
+    (item) => yPx >= item.montageY0 - 1 && yPx <= item.montageY1 + 1
+  );
+  if (!slice && montage.slices.length > 0) {
+    slice = montage.slices.reduce((best, item) => {
+      const mid = (item.montageY0 + item.montageY1) / 2;
+      const bestMid = (best.montageY0 + best.montageY1) / 2;
+      return Math.abs(yPx - mid) < Math.abs(yPx - bestMid) ? item : best;
+    });
+    const mid = (slice.montageY0 + slice.montageY1) / 2;
+    if (Math.abs(yPx - mid) > 18) return undefined;
+  }
+  return slice;
+}
+
+function montageXToPagePercent(chordX: number, montage: ChordBandMontageLike): number {
+  const gutter = Math.max(0, montage.gutterWidth || 0);
+  const xPx = (chordX / 100) * montage.width;
+  const musicW = Math.max(1, montage.width - gutter);
+  const musicX = xPx - gutter;
+  return Math.max(0, Math.min(96, (musicX / musicW) * 100));
 }
 
 /**
@@ -95,33 +128,57 @@ export function mapMontageChordsToPage(
 
   return chords.flatMap((chord) => {
     const yPx = (chord.y / 100) * montage.height;
-    let slice = montage.slices.find(
-      (item) => yPx >= item.montageY0 - 1 && yPx <= item.montageY1 + 1
-    );
-    if (!slice && montage.slices.length > 0) {
-      slice = montage.slices.reduce((best, item) => {
-        const mid = (item.montageY0 + item.montageY1) / 2;
-        const bestMid = (best.montageY0 + best.montageY1) / 2;
-        return Math.abs(yPx - mid) < Math.abs(yPx - bestMid) ? item : best;
-      });
-      const mid = (slice.montageY0 + slice.montageY1) / 2;
-      if (Math.abs(yPx - mid) > 18) return [];
-    }
+    const slice = montageSliceForChord(chord, montage, yPx);
     if (!slice) return [];
 
     const span = Math.max(1, slice.montageY1 - slice.montageY0);
-    const t = Math.max(0, Math.min(1, (yPx - slice.montageY0) / span));
+    const t = Number.isFinite(Number(chord.strip))
+      ? 0.55
+      : Math.max(0, Math.min(1, (yPx - slice.montageY0) / span));
     const srcY = slice.srcY + t * slice.srcH;
     const pageY = (srcY / montage.sourceHeight) * 100;
     const heightPx = ((chord.height || 3) / 100) * montage.height;
     const pageHeight = (heightPx / montage.sourceHeight) * 100;
+    const rest = { ...chord };
+    delete rest.strip;
 
     return [{
-      ...chord,
-      x: Math.max(0, Math.min(96, chord.x)),
+      ...rest,
+      x: montageXToPagePercent(chord.x, montage),
       y: Math.max(0, Math.min(96, pageY)),
       width: chord.width || 5,
       height: Math.max(2, pageHeight),
     }];
+  });
+}
+
+/**
+ * Snap Vision hits onto known staff chord bands and drop hits that are far from every band.
+ * Reduces lyric/title false adds without using piece-specific names.
+ */
+export function placeVisionOnStaffBands(
+  chords: ChordPosition[],
+  keepYRangesPct?: Array<{ top: number; bottom: number }>,
+  maxOutsidePct = 4.8
+): ChordPosition[] {
+  if (!keepYRangesPct || keepYRangesPct.length === 0) return chords.map((chord) => ({ ...chord }));
+
+  return chords.flatMap((chord) => {
+    let best = keepYRangesPct[0];
+    let bestDist = Infinity;
+    keepYRangesPct.forEach((range) => {
+      const dist = chord.y < range.top
+        ? range.top - chord.y
+        : chord.y > range.bottom
+          ? chord.y - range.bottom
+          : 0;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = range;
+      }
+    });
+    if (bestDist > maxOutsidePct) return [];
+    const mid = (best.top + best.bottom) / 2;
+    return [{ ...chord, y: mid }];
   });
 }

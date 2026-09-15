@@ -7,7 +7,7 @@ import { VISION_BAND_MONTAGE_SYSTEM_PROMPT, resolveVisionPrompts } from './visio
 
 describe('Vision AI Service', () => {
   it('has a comprehensive prompt enforcing clean music chord extraction', () => {
-    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('expert music notation');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('lead-sheet reader');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('xPercent');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('yPercent');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('chords');
@@ -17,6 +17,7 @@ describe('Vision AI Service', () => {
   it('uses a stacked staff-band prompt for layout-aware Vision', () => {
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('VERTICAL STACK');
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('{"chords":[]}');
+    expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('"strip"');
     expect(resolveVisionPrompts('staff-bands').system).toBe(VISION_BAND_MONTAGE_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet').system).toBe(VISION_DETECTION_SYSTEM_PROMPT);
   });
@@ -85,5 +86,14 @@ describe('Vision AI Service', () => {
     });
     expect(parsed.length).toBe(1);
     expect(parsed[0].originalText).toBe('Cmaj7');
+  });
+
+  it('keeps a 1-based strip index from labeled montages', () => {
+    const parsed = parseVisionChordsResponse({
+      chords: [{ chord: 'Fm7', strip: 3, xPercent: 22, yPercent: 40 }],
+    });
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].strip).toBe(3);
+    expect(parsed[0].originalText).toBe('Fm7');
   });
 });

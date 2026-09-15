@@ -13,7 +13,7 @@ import {
   systemsWithSymbolInk,
 } from './staffGeometry';
 import { cropBandForOcr, invertSheetForOcr, rasterizeSheet } from './rasterize';
-import { mergeChordDetections } from './mergeChordDetections';
+import { mergeChordDetections, placeVisionOnStaffBands } from './mergeChordDetections';
 
 export type { ChordPosition };
 export { isValidChord };
@@ -38,7 +38,7 @@ export interface CandidateToken {
  * - Quality: maj, m, 7, sus4, dim, aug, etc.
  * - Optional bass note: /[A-G][#b]?[0-9]*
  */
-const STRICT_CHORD_REGEX = /^([A-G][#b]?)((?:maj13|maj9|maj7|maj|M9|M7|M|m7b5|m13|m11|m9|min7|min|m7|m6\/9|m6|m|dim7|dim|aug7|aug|\+|7sus4|7sus|sus4|sus2|sus|add11|add9|add4|add2|7b9|7#9|7b5|7#5|7alt|alt|13|11|9|7|6\/9|6|5|-7|-))?(?:\/([A-G][#b]?[0-9]*))?$/i;
+const STRICT_CHORD_REGEX = /^([A-G][#b]?)((?:maj13|maj9|maj7#5|maj7b5|maj7|maj|M9|M7|M|m7b5|m13|m11|m9|min7|min|m7|m6\/9|m6|m|dim7|dim|aug7|aug|\+|7sus4|7sus|sus4|sus2|sus|add11|add9|add4|add2|7b9|7#9|7#11|7b13|7b5|7#5|7alt|alt|13|11|9|7|6\/9|6|5|-7|-))?(?:\/([A-G][#b]?[0-9]*))?$/i;
 
 /**
  * Clean up common OCR artifacts on musical chord symbols, handling common misreadings
@@ -673,6 +673,12 @@ export async function scanSheetWithFallback(
     if (!canAttemptVision(visionOptions)) {
       return { chords: [], error: 'Vision AI is not configured' };
     }
+    if (systems.length > 0 && inkSystems.length === 0) {
+      return {
+        chords: [] as ChordPosition[],
+        error: 'No chord-band ink on staffed page; skipped Vision to avoid SATB/lyric false adds',
+      };
+    }
     onProgress?.({ status: 'Reading chord symbols with free Vision AI...', progress: 0.18 });
     return detectChordsWithSheetLayout(imageUrl, {
       systems: visionSystems,
@@ -694,7 +700,8 @@ export async function scanSheetWithFallback(
   ]);
 
   onProgress?.({ status: 'Merging OCR and Vision detections...', progress: 0.94 });
-  const merged = mergeChordDetections(ocrChords, visionResult.chords || [], keepYRangesPct);
+  const visionPlaced = placeVisionOnStaffBands(visionResult.chords || [], keepYRangesPct);
+  const merged = mergeChordDetections(ocrChords, visionPlaced, keepYRangesPct);
   const visionUsed = Boolean(visionResult.model) || (visionResult.chords || []).length > 0;
   if (visionUsed && visionResult.model) {
     onProgress?.({

@@ -20,6 +20,8 @@ export interface ChordPosition {
   width?: number;
   height?: number;
   confidence?: number;
+  /** 1-based chord-band index from a labeled Vision montage; dropped after mapping to the page. */
+  strip?: number;
 }
 
 // 12 chromatic pitches

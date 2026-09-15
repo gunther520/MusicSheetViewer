@@ -31,6 +31,7 @@ export interface ChordBandMontage {
   sourceWidth: number;
   sourceHeight: number;
   slices: MontageSlice[];
+  gutterWidth: number;
 }
 
 export interface ChordBandSliceRequest {
@@ -213,8 +214,9 @@ export async function buildChordBandMontage(
   const usable = slices.filter((slice) => slice.srcH >= 8 && sourceWidth >= 8);
   if (usable.length === 0 || sourceWidth <= 0 || sourceHeight <= 0) return null;
 
-  const upscale = Math.min(2.2, 1600 / Math.max(1, sourceWidth));
-  const gap = 8;
+  const upscale = Math.min(2.4, 2200 / Math.max(1, sourceWidth));
+  const gap = 10;
+  const gutter = Math.max(40, Math.round(sourceWidth * upscale * 0.03));
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     const { buildMontageWithSharp } = await import(/* @vite-ignore */ './rasterizeNode');
@@ -224,7 +226,8 @@ export async function buildChordBandMontage(
       sourceWidth,
       invert,
       upscale,
-      gap
+      gap,
+      gutter
     );
     return {
       dataUrl: `data:image/jpeg;base64,${uint8ToBase64(built.buffer)}`,
@@ -233,12 +236,14 @@ export async function buildChordBandMontage(
       sourceWidth,
       sourceHeight,
       slices: built.slices,
+      gutterWidth: built.gutterWidth,
     };
   }
 
   const img = typeof source === 'string' ? await loadDomImage(source) : source;
-  const outW = Math.max(8, Math.round(sourceWidth * upscale));
-  const bandHeights = usable.map((slice) => Math.max(24, Math.round(slice.srcH * upscale)));
+  const musicW = Math.max(8, Math.round(sourceWidth * upscale));
+  const outW = musicW + gutter;
+  const bandHeights = usable.map((slice) => Math.max(28, Math.round(slice.srcH * upscale)));
   const outH = bandHeights.reduce((sum, h) => sum + h, 0) + gap * (usable.length - 1);
   const canvas = document.createElement('canvas');
   canvas.width = outW;
@@ -252,18 +257,26 @@ export async function buildChordBandMontage(
   let y = 0;
   usable.forEach((slice, i) => {
     const h = bandHeights[i];
+    ctx.fillStyle = '#ececec';
+    ctx.fillRect(0, y, gutter, h);
+    ctx.fillStyle = '#111111';
+    ctx.font = `bold ${Math.max(16, Math.round(h * 0.42))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), gutter / 2, y + h / 2);
+
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, slice.srcY, sourceWidth, slice.srcH, 0, y, outW, h);
+    ctx.drawImage(img, 0, slice.srcY, sourceWidth, slice.srcH, gutter, y, musicW, h);
     if (invert) {
-      const imageData = ctx.getImageData(0, y, outW, h);
+      const imageData = ctx.getImageData(gutter, y, musicW, h);
       const data = imageData.data;
       for (let p = 0; p < data.length; p += 4) {
         data[p] = 255 - data[p];
         data[p + 1] = 255 - data[p + 1];
         data[p + 2] = 255 - data[p + 2];
       }
-      ctx.putImageData(imageData, 0, y);
+      ctx.putImageData(imageData, gutter, y);
     }
     mapped.push({
       montageY0: y,
@@ -275,19 +288,20 @@ export async function buildChordBandMontage(
   });
 
   return {
-    dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+    dataUrl: canvas.toDataURL('image/jpeg', 0.92),
     width: outW,
     height: outH,
     sourceWidth,
     sourceHeight,
     slices: mapped,
+    gutterWidth: gutter,
   };
 }
 
 export async function sheetToDataUrl(
   source: string,
   invert = false,
-  maxDim = 1600
+  maxDim = 2048
 ): Promise<string> {
   if (source.startsWith('data:') && !invert) return source;
 

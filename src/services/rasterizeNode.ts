@@ -65,17 +65,21 @@ export async function buildMontageWithSharp(
   sourceWidth: number,
   invert: boolean,
   upscale: number,
-  gap = 8
+  gap = 8,
+  gutterWidth = 0
 ): Promise<{
   buffer: Uint8Array;
   width: number;
   height: number;
+  gutterWidth: number;
   slices: Array<{ montageY0: number; montageY1: number; srcY: number; srcH: number }>;
 }> {
   const meta = await sharp(filePath).metadata();
   const imgW = meta.width || sourceWidth;
   const imgH = meta.height || 1;
-  const outW = Math.max(8, Math.round(sourceWidth * upscale));
+  const musicW = Math.max(8, Math.round(sourceWidth * upscale));
+  const gutter = Math.max(0, Math.round(gutterWidth));
+  const outW = musicW + gutter;
   const mapped: Array<{ montageY0: number; montageY1: number; srcY: number; srcH: number }> = [];
   const composites: Array<{ input: Uint8Array; top: number; left: number }> = [];
   let y = 0;
@@ -84,13 +88,24 @@ export async function buildMontageWithSharp(
     const slice = slices[i];
     const top = Math.max(0, Math.min(imgH - 1, Math.round(slice.srcY)));
     const height = Math.max(8, Math.min(imgH - top, Math.round(slice.srcH)));
-    const outH = Math.max(24, Math.round(height * upscale));
+    const outH = Math.max(28, Math.round(height * upscale));
     let pipeline = sharp(filePath)
       .extract({ left: 0, top, width: Math.max(8, Math.min(imgW, Math.round(sourceWidth))), height })
-      .resize({ width: outW, height: outH });
+      .resize({ width: musicW, height: outH });
     if (invert) pipeline = pipeline.negate();
     const input = await pipeline.png().toBuffer();
-    composites.push({ input, top: y, left: 0 });
+    composites.push({ input, top: y, left: gutter });
+    if (gutter > 0) {
+      const fontSize = Math.max(16, Math.round(outH * 0.42));
+      const labelSvg = new TextEncoder().encode(
+        `<svg width="${gutter}" height="${outH}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#ececec"/>
+          <text x="${gutter / 2}" y="${outH / 2}" font-size="${fontSize}" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#111111" text-anchor="middle" dominant-baseline="central">${i + 1}</text>
+        </svg>`
+      );
+      const label = await sharp(labelSvg).png().toBuffer();
+      composites.push({ input: label, top: y, left: 0 });
+    }
     mapped.push({
       montageY0: y,
       montageY1: y + outH,
@@ -110,10 +125,16 @@ export async function buildMontageWithSharp(
     },
   })
     .composite(composites)
-    .jpeg({ quality: 90 })
+    .jpeg({ quality: 92 })
     .toBuffer();
 
-  return { buffer, width: outW, height: Math.max(8, y), slices: mapped };
+  return {
+    buffer,
+    width: outW,
+    height: Math.max(8, y),
+    gutterWidth: gutter,
+    slices: mapped,
+  };
 }
 
 export async function invertSheetWithSharp(filePath: string, maxDim = 2000): Promise<Uint8Array> {
@@ -132,7 +153,7 @@ export async function invertSheetWithSharp(filePath: string, maxDim = 2000): Pro
 
 export async function fileToVisionJpegDataUrl(
   filePath: string,
-  maxDim = 1600,
+  maxDim = 2048,
   invert = false
 ): Promise<string> {
   const meta = await sharp(filePath).metadata();
@@ -143,6 +164,6 @@ export async function fileToVisionJpegDataUrl(
   const height = Math.max(1, Math.round(sourceHeight * scale));
   let pipeline = sharp(filePath).resize({ width, height });
   if (invert) pipeline = pipeline.negate();
-  const buffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+  const buffer = await pipeline.jpeg({ quality: 92 }).toBuffer();
   return `data:image/jpeg;base64,${buffer.toString('base64')}`;
 }
