@@ -1,10 +1,8 @@
 /**
  * Vercel serverless function for free OpenRouter Vision chord detection.
- * Self-contained so the function can boot without bundling the Vite app graph.
+ * ZERO imports: extra files under api/ are treated as extra functions and crash boot.
  * Supports both Web Request handlers and Node (req, res) runtimes.
  */
-
-import { resolveVisionPrompts } from './visionPrompts';
 
 export const config = {
   runtime: 'nodejs',
@@ -21,6 +19,21 @@ const FREE_MODELS = [
   'inclusionai/ling-3.0-flash-vl:free',
   'openrouter/free',
 ] as const;
+
+const FULL_SHEET_PROMPT = `You are an expert engraver-level lead-sheet reader.
+Transcribe every printed chord symbol you can actually see. Never invent, never complete a progression, never copy chords from a title/header.
+Return ONLY JSON: {"chords":[{"chord":"string","xPercent":number,"yPercent":number,"widthPercent":number,"heightPercent":number}]}
+If there are no printed chord symbols, return {"chords":[]}.`;
+
+const BAND_PROMPT = `You are an expert lead-sheet chord reader.
+This image is a VERTICAL STACK of cropped chord-symbol bands. A gray left column numbers strips 1, 2, 3 from TOP to BOTTOM.
+Return ONLY JSON: {"chords":[{"chord":"string","strip":number,"xPercent":number,"yPercent":number,"widthPercent":number,"heightPercent":number}]}
+If a strip has no chord symbols, contribute nothing. If none, return {"chords":[]}.`;
+
+const FULL_SHEET_USER =
+  'Detect every printed chord-symbol occurrence on this image. Repeat identical chords as separate objects. If none, return {"chords":[]}.';
+const BAND_USER =
+  'Each numbered strip is one staff chord band. List every printed chord with strip + xPercent. If none, return {"chords":[]}.';
 
 type JsonBody = {
   image?: string;
@@ -80,9 +93,8 @@ async function completeFreeVision(image: string, apiKey: string, layout: string)
   const imageUrl = image.startsWith('http') || image.startsWith('data:')
     ? image
     : `data:image/jpeg;base64,${image}`;
-  const prompts = resolveVisionPrompts(layout === 'staff-bands' ? 'staff-bands' : 'full-sheet');
-  const system = prompts.system;
-  const user = prompts.user;
+  const system = layout === 'staff-bands' ? BAND_PROMPT : FULL_SHEET_PROMPT;
+  const user = layout === 'staff-bands' ? BAND_USER : FULL_SHEET_USER;
 
   let lastError = 'OpenRouter free-model request failed';
   let emptyModel: string | undefined;

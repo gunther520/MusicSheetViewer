@@ -38,10 +38,11 @@ describe('detect-chords API handler', () => {
     }
   });
 
-  it('does not import the Vite src graph (that crash is FUNCTION_INVOCATION_FAILED on Vercel)', async () => {
+  it('does not import anything (extra api/ files crash Vercel boot with FUNCTION_INVOCATION_FAILED)', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const source = fs.readFileSync(path.resolve(__dirname, '../api/detect-chords.ts'), 'utf8');
+    expect(source).not.toMatch(/^\s*import\s/m);
     expect(source).not.toMatch(/from ['"]\.\.\/src\//);
   });
 });
