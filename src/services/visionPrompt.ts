@@ -8,6 +8,7 @@ What counts as one chord symbol:
 - Jazz glyphs: △/∆/Δ = maj7 (write Cmaj7). ø/Ø = m7b5. Superscript 7 stays as 7.
 
 Hard rules:
+- Distinguish flat roots carefully: Eb vs Bb, Ab vs Db. Superscript 11 is 11, not 7.
 - List EACH printed occurrence separately. Repeated C C C is three objects with different xPercent.
 - Do not skip small, faint, or "simple" chords (C, F, G).
 - Do not read lyrics, titles, "C Major", composer names, Intro/Verse/Chorus, bar numbers, SATB labels, noteheads, or fingerings as chords.

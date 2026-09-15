@@ -166,40 +166,45 @@ export async function completeOpenRouterVision(options: {
   let emptyJsonModel: string | undefined;
 
   for (const model of models) {
-    const response = await fetch(OPENROUTER_API_URL, {
-      method: 'POST',
-      headers: buildOpenRouterHeaders(options.apiKey),
-      body: JSON.stringify(buildOpenRouterVisionBody(
-        imageUrl,
-        options.systemPrompt,
-        model,
-        options.userText
-      )),
-    });
+    const attempts = model === preferred ? 3 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const response = await fetch(OPENROUTER_API_URL, {
+        method: 'POST',
+        headers: buildOpenRouterHeaders(options.apiKey),
+        body: JSON.stringify(buildOpenRouterVisionBody(
+          imageUrl,
+          options.systemPrompt,
+          model,
+          options.userText
+        )),
+      });
 
-    if (!response.ok) {
-      lastError = await response.text();
-      if ([400, 402, 404, 408, 429, 502, 503].includes(response.status)) {
-        if (response.status === 429) {
-          await new Promise((resolve) => setTimeout(resolve, 1200));
+      if (!response.ok) {
+        lastError = await response.text();
+        if ([400, 402, 404, 408, 429, 502, 503].includes(response.status)) {
+          if (response.status === 429) {
+            await new Promise((resolve) => setTimeout(resolve, 1600 * (attempt + 1)));
+          }
+          continue;
         }
-        continue;
+        throw new Error(`OpenRouter error (${response.status}): ${lastError}`);
       }
-      throw new Error(`OpenRouter error (${response.status}): ${lastError}`);
-    }
 
-    const data = await response.json();
-    const raw = extractOpenRouterMessageContent(data);
-    if (hasNonEmptyChordsPayload(raw)) {
-      const usedModel = typeof data?.model === 'string' && data.model
-        ? data.model
-        : model;
-      return { raw, model: usedModel };
+      const data = await response.json();
+      const raw = extractOpenRouterMessageContent(data);
+      if (hasNonEmptyChordsPayload(raw)) {
+        const usedModel = typeof data?.model === 'string' && data.model
+          ? data.model
+          : model;
+        return { raw, model: usedModel };
+      }
+      if (extractJsonObject(raw)) {
+        emptyJsonModel = typeof data?.model === 'string' && data.model ? data.model : model;
+        // Empty JSON can be a true no-chord page; do not keep retrying the same model.
+        break;
+      }
+      lastError = `Free model ${model} returned no chord JSON`;
     }
-    if (extractJsonObject(raw)) {
-      emptyJsonModel = typeof data?.model === 'string' && data.model ? data.model : model;
-    }
-    lastError = `Free model ${model} returned no chord JSON`;
   }
 
   if (emptyJsonModel) {

@@ -411,15 +411,6 @@ export function systemsToMontageSlices(
   });
 }
 
-function chunkItems<T>(items: T[], size: number): T[][] {
-  if (size <= 0) return [items];
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
-
 async function pause(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -447,50 +438,40 @@ export async function detectChordsWithSheetLayout(
 
   if (options.systems.length > 0) {
     const allSlices = systemsToMontageSlices(options.systems, options.raster);
-    const groups = chunkItems(allSlices, 4);
-    const mapped: ChordPosition[] = [];
+    const montage = await buildChordBandMontage(
+      imageSource,
+      allSlices,
+      options.raster.sourceWidth,
+      options.raster.sourceHeight,
+      invert
+    );
+    let mapped: ChordPosition[] = [];
     let model: string | undefined;
     let error: string | undefined;
-
-    for (let g = 0; g < groups.length; g++) {
-      const montage = await buildChordBandMontage(
-        imageSource,
-        groups[g],
-        options.raster.sourceWidth,
-        options.raster.sourceHeight,
-        invert
-      );
-      if (!montage) continue;
+    if (montage) {
       try {
         const parsed = await requestVisionChords(montage.dataUrl, 'staff-bands', options);
-        mapped.push(...mapMontageChordsToPage(parsed.chords, montage));
-        if (parsed.model) model = parsed.model;
-        if (parsed.error) error = parsed.error;
+        mapped = mapMontageChordsToPage(parsed.chords, montage);
+        model = parsed.model;
+        error = parsed.error;
       } catch (montageError) {
-        console.warn('Staff-band Vision failed; trying remaining passes:', montageError);
-      }
-      if (g < groups.length - 1) await pause(400);
-    }
-
-    const sparse = mapped.length < Math.max(4, options.systems.length * 2);
-    if (sparse) {
-      try {
-        if (mapped.length > 0) await pause(400);
-        const full = await requestVisionChords(fullPage, 'full-sheet', options);
-        const combined = mergeChordDetections(mapped, full.chords || []);
-        return {
-          chords: combined,
-          model: full.model || model,
-          error: full.error || error,
-        };
-      } catch (fullError: any) {
-        console.warn('Full-sheet Vision failed after staff-band pass:', fullError);
-        if (mapped.length > 0) return { chords: mapped, model, error };
-        return { chords: [], error: fullError?.message || 'Vision AI failed' };
+        console.warn('Staff-band Vision failed; trying full-sheet free Vision:', montageError);
       }
     }
 
-    return { chords: mapped, model, error };
+    try {
+      if (mapped.length > 0) await pause(500);
+      const full = await requestVisionChords(fullPage, 'full-sheet', options);
+      return {
+        chords: mergeChordDetections(mapped, full.chords || []),
+        model: full.model || model,
+        error: full.error || error,
+      };
+    } catch (fullError: any) {
+      console.warn('Full-sheet Vision failed after staff-band pass:', fullError);
+      if (mapped.length > 0) return { chords: mapped, model, error };
+      return { chords: [], error: fullError?.message || 'Vision AI failed' };
+    }
   }
 
   const parsed = await requestVisionChords(fullPage, 'full-sheet', options);

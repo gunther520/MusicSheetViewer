@@ -7,6 +7,7 @@ describe('detectionScore', () => {
     expect(chordsEquivalent('C/E', 'C')).toBe(true);
     expect(chordsEquivalent('Gsus4', 'Gsus4')).toBe(true);
     expect(chordsEquivalent('Cmaj7', 'C△7')).toBe(true);
+    expect(chordsEquivalent('Bmaj7#5', 'Bma7#5')).toBe(true);
     expect(chordsEquivalent('Dm', 'G')).toBe(false);
   });
 

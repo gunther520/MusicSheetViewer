@@ -260,7 +260,7 @@ export function getSemitoneDistance(fromKey: string, toKey: string): number {
 export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): boolean {
   const raw = token.trim();
   const cleaned = normalizeAccidentals(raw.replace(/^[\[\(\{<|"']+|[\]\)\}>|"':;,]+$/g, ''));
-  if (!cleaned || cleaned.length > 10) return false;
+  if (!cleaned || cleaned.length > 14) return false;
 
   const upper = cleaned.toUpperCase();
 
@@ -305,7 +305,8 @@ export function isLikelyChordSymbol(token: string, allowSingleLetterA = false): 
     '', 'm', 'min', '-', 'maj', 'M', 'maj7', 'M7', '7', 'm7', 'min7', '-7',
     'dim', 'dim7', 'aug', '+', 'sus', 'sus2', 'sus4', '7sus4', '7sus',
     'add9', 'add2', 'add4', 'add11', '9', 'm9', 'maj9', '11', 'm11', '13', 'm13',
-    '6', 'm6', '6/9', 'm6/9', '5', 'm7b5', '7b5', '7#5', '7b9', '7#9', 'alt'
+    '6', 'm6', '6/9', 'm6/9', '5', 'm7b5', '7b5', '7#5', '7b9', '7#9', '7#11', '7b13', 'alt',
+    'maj7#5', 'maj7b5', 'ma7#5', 'add#11',
   ];
 
   const q = parsed.quality.toLowerCase();

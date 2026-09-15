@@ -7,6 +7,7 @@ export function normalizeEvalChord(name: string): string {
   return name
     .trim()
     .replace(/[△∆Δ]/g, 'maj7')
+    .replace(/ma(?!j)7/g, 'maj7')
     .replace(/maj77/g, 'maj7')
     .replace(/[♯]/g, '#')
     .replace(/[♭]/g, 'b')

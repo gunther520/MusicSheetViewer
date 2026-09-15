@@ -35,6 +35,7 @@ describe('Generalized Chord Recognition & Normalization', () => {
     expect(normalizeChordToken('G/B')).toEqual(['G/B']);
     expect(normalizeChordToken('GIB')).toEqual(['G/B']);
     expect(normalizeChordToken('D/F#')).toEqual(['D/F#']);
+    expect(normalizeChordToken('Bma7#5')).toEqual(['Bmaj7#5']);
   });
 
   it('handles compound tokens and brackets cleanly', () => {

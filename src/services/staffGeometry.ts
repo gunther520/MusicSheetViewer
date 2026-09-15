@@ -310,7 +310,7 @@ export function staffBandHasSymbolInk(
   inkThreshold?: number
 ): boolean {
   const { peaks, fill } = scoreChordBandInk(width, height, gray, system, inkThreshold);
-  return peaks >= 2 && fill >= 0.013 && fill <= 0.08 && !(fill > 0.03 && peaks >= 10);
+  return peaks >= 2 && fill >= 0.01 && fill <= 0.12 && !(fill > 0.04 && peaks >= 12);
 }
 
 export function systemsWithSymbolInk(

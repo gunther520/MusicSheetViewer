@@ -72,6 +72,7 @@ export function normalizeChordToken(raw: string): string[] {
   t = t.replace(/[♯]/g, '#').replace(/[♭]/g, 'b');
   t = t.replace(/[△∆Δ](?=7)/g, 'maj');
   t = t.replace(/[△∆Δ]/g, 'maj7');
+  t = t.replace(/([A-G][#b]?)ma(?!j)([79])/gi, '$1maj$2');
 
   // Normalize slash chord separators (e.g. C/E, C|E, C\E, C1E, CIE, C!E)
   t = t.replace(/([A-G][#b]?)[|I1\\!]([A-G][#b]?)/gi, '$1/$2');
@@ -673,12 +674,6 @@ export async function scanSheetWithFallback(
     if (!canAttemptVision(visionOptions)) {
       return { chords: [], error: 'Vision AI is not configured' };
     }
-    if (systems.length > 0 && inkSystems.length === 0) {
-      return {
-        chords: [] as ChordPosition[],
-        error: 'No chord-band ink on staffed page; skipped Vision to avoid SATB/lyric false adds',
-      };
-    }
     onProgress?.({ status: 'Reading chord symbols with free Vision AI...', progress: 0.18 });
     return detectChordsWithSheetLayout(imageUrl, {
       systems: visionSystems,
@@ -700,7 +695,11 @@ export async function scanSheetWithFallback(
   ]);
 
   onProgress?.({ status: 'Merging OCR and Vision detections...', progress: 0.94 });
-  const visionPlaced = placeVisionOnStaffBands(visionResult.chords || [], keepYRangesPct);
+  const visionRaw = visionResult.chords || [];
+  const dropHallucinations = ocrChords.length === 0 && inkSystems.length === 0 && systems.length > 0;
+  const visionPlaced = dropHallucinations
+    ? []
+    : placeVisionOnStaffBands(visionRaw, keepYRangesPct);
   const merged = mergeChordDetections(ocrChords, visionPlaced, keepYRangesPct);
   const visionUsed = Boolean(visionResult.model) || (visionResult.chords || []).length > 0;
   if (visionUsed && visionResult.model) {

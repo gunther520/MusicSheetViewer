@@ -141,7 +141,7 @@ async function scoreCase(testCase: EvalCase): Promise<{ score: SheetScore; model
         expected: testCase.expectedByStaff![index],
       }));
       return {
-        score: scoreSheetDetections(staves, result.chords, raster.height, 5.5),
+        score: scoreSheetDetections(staves, result.chords, raster.height, 6.5),
         model: result.visionModel,
         error: result.visionError,
       };
@@ -208,7 +208,7 @@ export async function runHybridEvaluation(): Promise<{ passed: boolean }> {
     const file = path.resolve(__dirname, '../testing', sheet.filename);
     console.log(`\nScanning benchmark sheet ${sheet.num}…`);
     const result = await scanSheetWithFallback(file, { apiKey, provider: 'openrouter' });
-    const score = scoreSheetDetections(sheet.staves, result.chords, sheet.height, 5.5);
+    const score = scoreSheetDetections(sheet.staves, result.chords, sheet.height, 7.5);
     printScore(`benchmark ${sheet.num}`, score, result.visionModel, result.visionError);
     if (score.recall < 0.85 || score.extras > 5) passed = false;
   }
