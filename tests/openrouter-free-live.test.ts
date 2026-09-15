@@ -2,12 +2,9 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { completeOpenRouterVision, isFreeOpenRouterModel } from '../src/services/openRouterClient';
-import { parseVisionChordsResponse, systemsToMontageSlices } from '../src/services/visionAiService';
+import { parseVisionChordsResponse } from '../src/services/visionAiService';
 import { resolveVisionPrompts } from '../src/services/visionPrompt';
 import { isValidChord } from '../src/utils/chordUtils';
-import { rasterizeSheet, buildChordBandMontage } from '../src/services/rasterize';
-import { detectStaffSystemsFromGray, systemsWithSymbolInk } from '../src/services/staffGeometry';
-import { mapMontageChordsToPage } from '../src/services/mergeChordDetections';
 import { scanSheetWithFallback } from '../src/services/ocrService';
 
 function loadLocalOpenRouterKey(): string | undefined {
@@ -49,35 +46,18 @@ describe.skipIf(!apiKey)('OpenRouter free live chord detection', () => {
     });
   }, 120000);
 
-  it('reads stacked staff-band crops on a random online hymn lead sheet', async () => {
+  it('hybrid OCR + free Vision finds chords on a random online hymn lead sheet', async () => {
     const file = path.resolve(__dirname, '../testing/random_sheets/are_you_washed_1200.png');
-    const raster = await rasterizeSheet(file);
-    const systems = systemsWithSymbolInk(
-      raster.width,
-      raster.height,
-      raster.gray,
-      detectStaffSystemsFromGray(raster.width, raster.height, raster.gray)
-    );
-    expect(systems.length).toBeGreaterThan(0);
-    const montage = await buildChordBandMontage(
-      file,
-      systemsToMontageSlices(systems, raster),
-      raster.sourceWidth,
-      raster.sourceHeight
-    );
-    expect(montage).toBeTruthy();
-    const prompts = resolveVisionPrompts('staff-bands');
-    const { raw, model } = await completeOpenRouterVision({
-      image: montage!.dataUrl,
+    const chords = await scanSheetWithFallback(file, {
       apiKey: apiKey as string,
-      systemPrompt: prompts.system,
-      userText: prompts.user,
+      provider: 'openrouter',
     });
-    expect(isFreeOpenRouterModel(model) || model.endsWith(':free') || model === 'openrouter/free').toBe(true);
-    const mapped = mapMontageChordsToPage(parseVisionChordsResponse(raw), montage!);
-    const names = mapped.map((chord) => chord.originalText);
-    expect(names.some((name) => ['C', 'F', 'G'].includes(name))).toBe(true);
-    mapped.forEach((chord) => {
+    const names = chords.map((chord) => chord.originalText);
+    expect(names).toContain('C');
+    expect(names).toContain('F');
+    expect(names).toContain('G');
+    expect(chords.length).toBeGreaterThanOrEqual(6);
+    chords.forEach((chord) => {
       expect(isValidChord(chord.originalText)).toBe(true);
       expect(chord.y).toBeGreaterThan(0);
       expect(chord.y).toBeLessThan(100);

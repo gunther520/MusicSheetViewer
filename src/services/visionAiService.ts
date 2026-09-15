@@ -376,8 +376,7 @@ export async function detectChordsWithSheetLayout(
   if (!canAttemptVision(options)) return [];
 
   const invert = Boolean(options.invertFullPage);
-  let layout: VisionSheetLayout = 'full-sheet';
-  let image = await prepareSheetImageForVision(
+  const fullPage = await prepareSheetImageForVision(
     invert ? await sheetToDataUrl(imageSource, true) : imageSource
   );
 
@@ -389,15 +388,25 @@ export async function detectChordsWithSheetLayout(
       options.raster.sourceHeight,
       invert
     );
-    if (!montage) return [];
-    layout = 'staff-bands';
-    image = montage.dataUrl;
-    const parsed = await requestVisionChords(image, layout, options);
-    return mapMontageChordsToPage(parsed, montage);
+    if (montage) {
+      try {
+        const parsed = await requestVisionChords(montage.dataUrl, 'staff-bands', options);
+        const mapped = mapMontageChordsToPage(parsed, montage);
+        if (mapped.length > 0) return mapped;
+      } catch (error) {
+        console.warn('Staff-band Vision failed; trying full-sheet free Vision:', error);
+      }
+    }
+    try {
+      return await requestVisionChords(fullPage, 'full-sheet', options);
+    } catch (error) {
+      console.warn('Full-sheet Vision failed after staff-band pass:', error);
+      return [];
+    }
   }
 
-  const parsed = await requestVisionChords(image, layout, options);
-  return alignDetectedChords(image, parsed);
+  const parsed = await requestVisionChords(fullPage, 'full-sheet', options);
+  return alignDetectedChords(fullPage, parsed);
 }
 
 /**

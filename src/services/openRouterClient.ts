@@ -15,15 +15,11 @@ export const OPENROUTER_PREFERRED_VL_MODEL = 'inclusionai/ling-3.0-flash-vl:free
 /** Explicit free vision fallbacks if the preferred VL model is unavailable. All slugs must stay `:free`. */
 export const OPENROUTER_FREE_FALLBACK_MODELS = [
   OPENROUTER_PREFERRED_VL_MODEL,
-  'google/gemma-4-26b-a4b-it:free',
-  'google/gemma-4-31b-it:free',
 ] as const;
 
 export const OPENROUTER_FREE_MODEL_CANDIDATES = [
   OPENROUTER_PREFERRED_VL_MODEL,
   OPENROUTER_FREE_MODEL,
-  'google/gemma-4-26b-a4b-it:free',
-  'google/gemma-4-31b-it:free',
 ] as const;
 
 export function isFreeOpenRouterModel(model: string): boolean {
@@ -167,6 +163,7 @@ export async function completeOpenRouterVision(options: {
   ];
 
   let lastError = 'OpenRouter free-model request failed';
+  let emptyJsonModel: string | undefined;
 
   for (const model of models) {
     const response = await fetch(OPENROUTER_API_URL, {
@@ -183,6 +180,9 @@ export async function completeOpenRouterVision(options: {
     if (!response.ok) {
       lastError = await response.text();
       if ([400, 402, 404, 408, 429, 502, 503].includes(response.status)) {
+        if (response.status === 429) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
         continue;
       }
       throw new Error(`OpenRouter error (${response.status}): ${lastError}`);
@@ -196,7 +196,14 @@ export async function completeOpenRouterVision(options: {
         : model;
       return { raw, model: usedModel };
     }
+    if (extractJsonObject(raw)) {
+      emptyJsonModel = typeof data?.model === 'string' && data.model ? data.model : model;
+    }
     lastError = `Free model ${model} returned no chord JSON`;
+  }
+
+  if (emptyJsonModel) {
+    return { raw: '{"chords":[]}', model: emptyJsonModel };
   }
 
   throw new Error(lastError);
