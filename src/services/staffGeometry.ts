@@ -67,6 +67,71 @@ export interface StaffSystem {
   isGrandStaff: boolean;
 }
 
+type FiveLineStaff = { top: number; bottom: number; spacing: number };
+
+function collectFiveLineStaves(
+  smoothed: Float64Array,
+  height: number,
+  peakFloor: number,
+  cvMax = 0.22
+): FiveLineStaff[] {
+  const rawPeaks: Array<{ y: number; val: number }> = [];
+  for (let y = 1; y < height - 1; y++) {
+    if (smoothed[y] >= peakFloor && smoothed[y] >= smoothed[y - 1] && smoothed[y] >= smoothed[y + 1]) {
+      rawPeaks.push({ y, val: smoothed[y] });
+    }
+  }
+
+  const peaks: number[] = [];
+  rawPeaks.forEach((peak) => {
+    const prev = peaks[peaks.length - 1];
+    if (prev === undefined || peak.y - prev >= 3) {
+      peaks.push(peak.y);
+      return;
+    }
+    if (peak.val > smoothed[prev]) {
+      peaks[peaks.length - 1] = peak.y;
+    }
+  });
+
+  if (peaks.length < 5) return [];
+
+  const fiveLineStaves: FiveLineStaff[] = [];
+  for (let i = 0; i <= peaks.length - 5; i++) {
+    const group = peaks.slice(i, i + 5);
+    const spacings = [
+      group[1] - group[0],
+      group[2] - group[1],
+      group[3] - group[2],
+      group[4] - group[3],
+    ];
+    const mean = spacings.reduce((sum, val) => sum + val, 0) / spacings.length;
+    if (mean < 3 || mean > Math.max(16, height * 0.07)) continue;
+    const variance = spacings.reduce((sum, val) => sum + (val - mean) ** 2, 0) / spacings.length;
+    const cv = Math.sqrt(variance) / mean;
+    if (cv > cvMax) continue;
+
+    const top = group[0];
+    const bottom = group[4];
+    const prev = fiveLineStaves[fiveLineStaves.length - 1];
+    if (prev && Math.abs(top - prev.top) < mean * 2) continue;
+    fiveLineStaves.push({ top, bottom, spacing: mean });
+  }
+  return fiveLineStaves;
+}
+
+function mergeFiveLineStaves(primary: FiveLineStaff[], extra: FiveLineStaff[]): FiveLineStaff[] {
+  const merged = [...primary];
+  extra.forEach((staff) => {
+    const nearby = merged.some((existing) => {
+      const minSpacing = Math.max(existing.spacing, staff.spacing);
+      return Math.abs(staff.top - existing.top) < minSpacing * 4;
+    });
+    if (!nearby) merged.push(staff);
+  });
+  return merged.sort((a, b) => a.top - b.top);
+}
+
 /**
  * Detect musical staff systems and the chord-symbol band sitting above each staff.
  * Layout-based only: horizontal ink projection + regularly spaced 5-line groups.
@@ -122,50 +187,12 @@ export function detectStaffSystemsFromGray(
   const sorted = Array.from(smoothed).sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] || 0;
   const p90 = sorted[Math.floor(sorted.length * 0.9)] || 0;
-  const peakFloor = Math.max(0.1, median * 3.2, p90 * 0.5);
+  const conservativeFloor = Math.max(0.1, median * 3.2, p90 * 0.5);
+  const sensitiveFloor = Math.max(0.07, median * 2.0, p90 * 0.4);
 
-  const rawPeaks: Array<{ y: number; val: number }> = [];
-  for (let y = 1; y < height - 1; y++) {
-    if (smoothed[y] >= peakFloor && smoothed[y] >= smoothed[y - 1] && smoothed[y] >= smoothed[y + 1]) {
-      rawPeaks.push({ y, val: smoothed[y] });
-    }
-  }
-
-  const peaks: number[] = [];
-  rawPeaks.forEach((peak) => {
-    const prev = peaks[peaks.length - 1];
-    if (prev === undefined || peak.y - prev >= 3) {
-      peaks.push(peak.y);
-      return;
-    }
-    if (peak.val > smoothed[prev]) {
-      peaks[peaks.length - 1] = peak.y;
-    }
-  });
-
-  if (peaks.length < 5) return [];
-
-  const fiveLineStaves: Array<{ top: number; bottom: number; spacing: number }> = [];
-  for (let i = 0; i <= peaks.length - 5; i++) {
-    const group = peaks.slice(i, i + 5);
-    const spacings = [
-      group[1] - group[0],
-      group[2] - group[1],
-      group[3] - group[2],
-      group[4] - group[3],
-    ];
-    const mean = spacings.reduce((sum, val) => sum + val, 0) / spacings.length;
-    if (mean < 3 || mean > Math.max(16, height * 0.07)) continue;
-    const variance = spacings.reduce((sum, val) => sum + (val - mean) ** 2, 0) / spacings.length;
-    const cv = Math.sqrt(variance) / mean;
-    if (cv > 0.22) continue;
-
-    const top = group[0];
-    const bottom = group[4];
-    const prev = fiveLineStaves[fiveLineStaves.length - 1];
-    if (prev && Math.abs(top - prev.top) < mean * 2) continue;
-    fiveLineStaves.push({ top, bottom, spacing: mean });
-  }
+  const primary = collectFiveLineStaves(smoothed, height, conservativeFloor, 0.22);
+  const extra = collectFiveLineStaves(smoothed, height, sensitiveFloor, 0.32);
+  const fiveLineStaves = mergeFiveLineStaves(primary, extra);
 
   if (fiveLineStaves.length === 0) return [];
 
@@ -189,7 +216,7 @@ export function detectStaffSystemsFromGray(
     const chordBandBottom = Math.max(0, staff.top - Math.round(staff.spacing * 0.15));
     const chordBandTop = Math.max(
       0,
-      staff.top - Math.max(Math.round(staff.spacing * 8.6), 28)
+      staff.top - Math.max(Math.round(staff.spacing * 7.2), 24)
     );
     const limitedTop = prevSystem
       ? Math.max(chordBandTop, prevSystem.staffBottom + Math.round(staff.spacing * 0.4))
@@ -310,7 +337,7 @@ export function staffBandHasSymbolInk(
   inkThreshold?: number
 ): boolean {
   const { peaks, fill } = scoreChordBandInk(width, height, gray, system, inkThreshold);
-  return peaks >= 2 && fill >= 0.01 && fill <= 0.12 && !(fill > 0.04 && peaks >= 12);
+  return peaks >= 2 && fill >= 0.012 && fill <= 0.09 && !(fill > 0.03 && peaks >= 10);
 }
 
 export function systemsWithSymbolInk(

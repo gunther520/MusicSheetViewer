@@ -181,6 +181,10 @@ export async function completeOpenRouterVision(options: {
 
       if (!response.ok) {
         lastError = await response.text();
+        const dailyLimit = response.status === 429 && /free-models-per-day/i.test(lastError);
+        if (dailyLimit) {
+          throw new Error(`OpenRouter error (${response.status}): ${lastError}`);
+        }
         if ([400, 402, 404, 408, 429, 502, 503].includes(response.status)) {
           if (response.status === 429) {
             await new Promise((resolve) => setTimeout(resolve, 1600 * (attempt + 1)));

@@ -447,7 +447,7 @@ export async function detectChordsWithSheetLayout(
     const mapped: ChordPosition[] = [];
     let model: string | undefined;
     let error: string | undefined;
-    const groups = chunkItems(allSlices, 4);
+    const groups = chunkItems(allSlices, 8);
     for (let g = 0; g < groups.length; g++) {
       const montage = await buildChordBandMontage(
         imageSource,
@@ -470,6 +470,9 @@ export async function detectChordsWithSheetLayout(
     }
 
     try {
+      if (mapped.length > 0 && mapped.length >= Math.max(4, options.systems.length)) {
+        return { chords: mapped, model, error };
+      }
       if (mapped.length > 0) await pause(500);
       const full = await requestVisionChords(fullPage, 'full-sheet', options);
       return {
