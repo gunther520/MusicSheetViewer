@@ -4,7 +4,7 @@
  * Supports both Web Request handlers and Node (req, res) runtimes.
  */
 
-import { resolveVisionPrompts } from '../src/services/visionPrompt';
+import { resolveVisionPrompts } from './visionPrompts';
 
 export const config = {
   runtime: 'nodejs',

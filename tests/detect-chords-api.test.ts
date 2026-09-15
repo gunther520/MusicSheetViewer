@@ -37,4 +37,11 @@ describe('detect-chords API handler', () => {
       if (previous) process.env.OPENROUTER_API_KEY = previous;
     }
   });
+
+  it('does not import the Vite src graph (that crash is FUNCTION_INVOCATION_FAILED on Vercel)', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const source = fs.readFileSync(path.resolve(__dirname, '../api/detect-chords.ts'), 'utf8');
+    expect(source).not.toMatch(/from ['"]\.\.\/src\//);
+  });
 });
