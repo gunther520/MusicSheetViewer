@@ -13,7 +13,10 @@ export function chordSpecificity(name: string): number {
 }
 
 function near(a: ChordPosition, b: ChordPosition, xTol = 4.6, yTol = 3.8): boolean {
-  return Math.abs(a.x - b.x) <= xTol && Math.abs(a.y - b.y) <= yTol;
+  const sameName = a.originalText === b.originalText;
+  const xLimit = sameName ? 8.8 : xTol;
+  const yLimit = sameName ? 3.6 : yTol;
+  return Math.abs(a.x - b.x) <= xLimit && Math.abs(a.y - b.y) <= yLimit;
 }
 
 function inKeepBands(chord: ChordPosition, keepYRangesPct?: Array<{ top: number; bottom: number }>): boolean {

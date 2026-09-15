@@ -415,6 +415,12 @@ async function pause(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function chunkItems<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks.length ? chunks : [items];
+}
+
 /**
  * Layout-aware Vision: labeled staff-band montage when staves exist, otherwise full page.
  * Uses only free OpenRouter models (or an explicit paid provider the user chose).
@@ -438,25 +444,29 @@ export async function detectChordsWithSheetLayout(
 
   if (options.systems.length > 0) {
     const allSlices = systemsToMontageSlices(options.systems, options.raster);
-    const montage = await buildChordBandMontage(
-      imageSource,
-      allSlices,
-      options.raster.sourceWidth,
-      options.raster.sourceHeight,
-      invert
-    );
-    let mapped: ChordPosition[] = [];
+    const mapped: ChordPosition[] = [];
     let model: string | undefined;
     let error: string | undefined;
-    if (montage) {
-      try {
-        const parsed = await requestVisionChords(montage.dataUrl, 'staff-bands', options);
-        mapped = mapMontageChordsToPage(parsed.chords, montage);
-        model = parsed.model;
-        error = parsed.error;
-      } catch (montageError) {
-        console.warn('Staff-band Vision failed; trying full-sheet free Vision:', montageError);
+    const groups = chunkItems(allSlices, 4);
+    for (let g = 0; g < groups.length; g++) {
+      const montage = await buildChordBandMontage(
+        imageSource,
+        groups[g],
+        options.raster.sourceWidth,
+        options.raster.sourceHeight,
+        invert
+      );
+      if (montage) {
+        try {
+          const parsed = await requestVisionChords(montage.dataUrl, 'staff-bands', options);
+          mapped.push(...mapMontageChordsToPage(parsed.chords, montage));
+          if (parsed.model) model = parsed.model;
+          if (parsed.error) error = parsed.error;
+        } catch (montageError) {
+          console.warn('Staff-band Vision failed; trying remaining passes:', montageError);
+        }
       }
+      if (g < groups.length - 1) await pause(400);
     }
 
     try {

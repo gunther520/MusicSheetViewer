@@ -3,7 +3,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { scanSheetWithFallback } from '../src/services/ocrService';
 import { rasterizeSheet } from '../src/services/rasterize';
-import { detectStaffSystemsFromGray } from '../src/services/staffGeometry';
+import { detectStaffSystemsFromGray, StaffSystem } from '../src/services/staffGeometry';
 import { scoreNameSequence, scoreSheetDetections, type SheetScore } from '../src/services/detectionScore';
 import { GROUND_TRUTH } from './evaluate-ground-truth';
 
@@ -113,6 +113,32 @@ const RANDOM_CASES: EvalCase[] = [
   },
 ];
 
+function alignExpectedToChordBands(
+  staves: Array<{ yCenter: number; expected: string[] }>,
+  systems: StaffSystem[],
+  sourceHeight: number,
+  rasterHeight: number
+): Array<{ yCenter: number; expected: string[] }> {
+  if (systems.length === 0) return staves;
+  return staves.map((staff) => {
+    const yRaster = (staff.yCenter / sourceHeight) * rasterHeight;
+    let best = systems[0];
+    let bestDist = Infinity;
+    systems.forEach((system) => {
+      const mid = (system.staffTop + system.staffBottom) / 2;
+      const dist = Math.abs(mid - yRaster);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = system;
+      }
+    });
+    return {
+      yCenter: (best.chordBandTop + best.chordBandBottom) / 2,
+      expected: staff.expected,
+    };
+  });
+}
+
 function printScore(label: string, score: SheetScore, model?: string, extraNote?: string) {
   const recallPct = (score.recall * 100).toFixed(1);
   const okRecall = score.recall >= 0.85 || score.expected === 0;
@@ -208,8 +234,20 @@ export async function runHybridEvaluation(): Promise<{ passed: boolean }> {
     const file = path.resolve(__dirname, '../testing', sheet.filename);
     console.log(`\nScanning benchmark sheet ${sheet.num}…`);
     const result = await scanSheetWithFallback(file, { apiKey, provider: 'openrouter' });
-    const score = scoreSheetDetections(sheet.staves, result.chords, sheet.height, 7.5);
-    printScore(`benchmark ${sheet.num}`, score, result.visionModel, result.visionError);
+    const raster = await rasterizeSheet(file);
+    const systems = detectStaffSystemsFromGray(raster.width, raster.height, raster.gray);
+    const aligned = alignExpectedToChordBands(sheet.staves, systems, sheet.height, raster.height);
+    const score = scoreSheetDetections(aligned, result.chords, raster.height, 4.8);
+    const bag = scoreNameSequence(
+      sheet.staves.flatMap((staff) => staff.expected),
+      result.chords.map((chord) => chord.originalText)
+    );
+    printScore(
+      `benchmark ${sheet.num}`,
+      score,
+      result.visionModel,
+      `${result.visionError || ''} bag ${((bag.hits / Math.max(1, bag.hits + bag.missed.length)) * 100).toFixed(1)}% extras ${bag.extras.length} detected ${result.chords.length}`.trim()
+    );
     if (score.recall < 0.85 || score.extras > 5) passed = false;
   }
 

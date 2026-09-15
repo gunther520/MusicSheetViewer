@@ -38,6 +38,13 @@ describe('mergeChordDetections', () => {
     expect(names).not.toContain('C');
   });
 
+  it('collapses duplicate same-name hits from a second Vision pass', () => {
+    const ocr = [chord('C', 20, 18, 'ocr-1')];
+    const vision = [chord('C', 22, 18.4, 'v-1'), chord('C', 21, 18.1, 'v-2')];
+    const merged = mergeChordDetections(ocr, vision);
+    expect(merged.filter((item) => item.originalText === 'C')).toHaveLength(1);
+  });
+
   it('drops Vision hits outside detected staff chord bands', () => {
     const ocr = [chord('C', 20, 18, 'ocr-1')];
     const vision = [chord('Am', 25, 82, 'v-lyric')];
