@@ -3,7 +3,9 @@ import {
   cleanOcrToken,
   filterAndClusterChords,
   CandidateToken,
-  snapToNearestStaffChordTrack
+  snapToNearestStaffChordTrack,
+  interpretMicroOcrText,
+  CHORD_OCR_CHARSET,
 } from './ocrService';
 
 describe('Music Sheet Staff-Aware Detection', () => {
@@ -77,5 +79,17 @@ describe('Music Sheet Staff-Aware Detection', () => {
       expect(matchBenchmarkSheet(sheet.filename)).toBe(sheet.num);
     });
     expect(matchBenchmarkSheet('testing/random_sheets/are_you_washed_1200.png')).toBeNull();
+  });
+
+  it('interprets leftover-crop OCR as chords and rejects lyric specks', () => {
+    expect(interpretMicroOcrText('Bb')).toBe('Bb');
+    expect(interpretMicroOcrText('C/E')).toBe('C/E');
+    expect(interpretMicroOcrText('CIE')).toBe('C/E');
+    expect(interpretMicroOcrText('the')).toBeNull();
+    expect(interpretMicroOcrText('and')).toBeNull();
+    expect(interpretMicroOcrText('')).toBeNull();
+    expect(CHORD_OCR_CHARSET).toContain('A');
+    expect(CHORD_OCR_CHARSET).toContain('/');
+    expect(CHORD_OCR_CHARSET).not.toMatch(/[WXYZ]/);
   });
 });

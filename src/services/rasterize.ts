@@ -201,6 +201,18 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+export function bandImageToDataUrl(band: BandImage): string | null {
+  const target = band.target;
+  if (typeof HTMLCanvasElement !== 'undefined' && target instanceof HTMLCanvasElement) {
+    return target.toDataURL('image/png');
+  }
+  if (target instanceof Uint8Array) {
+    return `data:image/png;base64,${uint8ToBase64(target)}`;
+  }
+  if (typeof target === 'string' && target.startsWith('data:')) return target;
+  return null;
+}
+
 /**
  * Stack full-width chord-band crops into one image for a single Vision call.
  */

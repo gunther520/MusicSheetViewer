@@ -3,7 +3,7 @@ import {
   parseVisionChordsResponse,
   VISION_DETECTION_SYSTEM_PROMPT,
 } from './visionAiService';
-import { VISION_BAND_MONTAGE_SYSTEM_PROMPT, resolveVisionPrompts } from './visionPrompt';
+import { VISION_BAND_MONTAGE_SYSTEM_PROMPT, VISION_ONE_GLYPH_SYSTEM_PROMPT, resolveVisionPrompts } from './visionPrompt';
 
 describe('Vision AI Service', () => {
   it('has a comprehensive prompt enforcing clean music chord extraction', () => {
@@ -26,6 +26,9 @@ describe('Vision AI Service', () => {
     expect(resolveVisionPrompts('staff-bands').system).toBe(VISION_BAND_MONTAGE_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet').system).toBe(VISION_DETECTION_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet', 'This page appears to be in F major.').user).toContain('F major');
+    expect(resolveVisionPrompts('one-glyph').system).toBe(VISION_ONE_GLYPH_SYSTEM_PROMPT);
+    expect(resolveVisionPrompts('one-glyph').user).toContain('leftover ink');
+    expect(VISION_ONE_GLYPH_SYSTEM_PROMPT).toMatch(/do not invent/i);
   });
 
   it('correctly parses raw structured JSON from Vision AI output', () => {

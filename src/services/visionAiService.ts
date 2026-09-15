@@ -312,6 +312,13 @@ export interface VisionChordResult {
   error?: string;
 }
 
+export async function detectSingleGlyphChord(
+  image: string,
+  options?: VisionAiOptions
+): Promise<VisionChordResult> {
+  return requestVisionChords(image, 'one-glyph', options);
+}
+
 async function requestVisionChords(
   image: string,
   layout: VisionSheetLayout,

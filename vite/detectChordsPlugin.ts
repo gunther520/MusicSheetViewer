@@ -60,7 +60,11 @@ export function detectChordsDevPlugin(apiKey: string): Plugin {
         return;
       }
 
-      const layout: VisionSheetLayout = body?.layout === 'staff-bands' ? 'staff-bands' : 'full-sheet';
+      const layout: VisionSheetLayout = body?.layout === 'staff-bands'
+        ? 'staff-bands'
+        : body?.layout === 'one-glyph'
+          ? 'one-glyph'
+          : 'full-sheet';
       const keyHint = typeof body?.keyHint === 'string' ? body.keyHint.trim().slice(0, 400) : undefined;
       const prompts = resolveVisionPrompts(layout, keyHint);
       const { raw } = await completeOpenRouterVision({

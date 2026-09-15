@@ -8,17 +8,19 @@ import {
 } from '../utils/chordUtils';
 import {
   detectStaffSystemsFromGray,
+  findChordInkBlobsOnSystems,
   staffSystemsToKeepYRangesPct,
   StaffSystem,
   systemsWithSymbolInk,
 } from './staffGeometry';
-import { cropBandForOcr, invertSheetForOcr, rasterizeSheet } from './rasterize';
+import { cropBandForOcr, invertSheetForOcr, rasterizeSheet, bandImageToDataUrl, type GrayRaster } from './rasterize';
 import { mergeChordDetections, placeVisionOnStaffBands } from './mergeChordDetections';
 import {
   extractPrintedKeyLabels,
   refineDetectedChords,
   resolveSongKey,
 } from './musicTheory';
+import { capLeftoverBlobs, uncoveredInkBlobs } from './leftoverInk';
 
 export type { ChordPosition };
 export { isValidChord };
@@ -169,6 +171,25 @@ export function normalizeChordToken(raw: string): string[] {
   }
 
   return found;
+}
+
+/** ASCII charset for leftover-blob OCR so Tesseract does not invent English words. */
+export const CHORD_OCR_CHARSET = 'ABCDEFGIabcdefg#b/m7susadjinuo+1234569-|';
+
+/**
+ * Turn a micro-crop OCR string into one chord name, or null for lyrics/specks.
+ */
+export function interpretMicroOcrText(raw: string): string | null {
+  if (!raw || !raw.trim()) return null;
+  const names = normalizeChordToken(raw);
+  const valid = names.filter((name) => isLikelyChordSymbol(name));
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return valid[0];
+  if (valid.length === 2 && !valid[0].includes('/') && !valid[1].includes('/')) {
+    const slash = `${valid[0]}/${valid[1]}`;
+    if (isLikelyChordSymbol(slash)) return slash;
+  }
+  return valid.reduce((best, name) => (name.length > best.length ? name : best));
 }
 
 export function cleanOcrToken(token: string): string[] {
@@ -650,6 +671,150 @@ export interface HybridScanResult {
   inferredKey?: string;
 }
 
+const MAX_VISION_MICRO_CROPS = 4;
+
+async function recognizeMicroCrop(
+  worker: Awaited<ReturnType<typeof createWorker>>,
+  target: unknown
+): Promise<string> {
+  const texts: string[] = [];
+  try {
+    await worker.setParameters({
+      tessedit_pageseg_mode: '8' as any,
+      tessedit_char_whitelist: CHORD_OCR_CHARSET,
+    });
+    const word = await worker.recognize(target as any);
+    if (word.data?.text) texts.push(word.data.text);
+    await worker.setParameters({
+      tessedit_pageseg_mode: '7' as any,
+      tessedit_char_whitelist: CHORD_OCR_CHARSET,
+    });
+    const line = await worker.recognize(target as any);
+    if (line.data?.text) texts.push(line.data.text);
+  } catch {
+    // ignore crop OCR failures
+  }
+  return texts.join(' ');
+}
+
+/**
+ * Re-read leftover chord-band ink that OCR+Vision missed.
+ * Never invents a name from the key if the crop is empty.
+ */
+export async function readLeftoverInkChords(options: {
+  imageSource: string | HTMLImageElement;
+  raster: GrayRaster;
+  systems: StaffSystem[];
+  existing: ChordPosition[];
+  invert?: boolean;
+  visionOptions?: {
+    apiKey?: string;
+    provider?: 'openrouter' | 'openai' | 'gemini' | 'anthropic';
+    apiEndpoint?: string;
+  };
+  onProgress?: (progress: ScanProgress) => void;
+}): Promise<{ chords: ChordPosition[]; visionUsed: boolean; visionModel?: string; visionError?: string }> {
+  const blobs = capLeftoverBlobs(uncoveredInkBlobs(
+    findChordInkBlobsOnSystems(
+      options.raster.width,
+      options.raster.height,
+      options.raster.gray,
+      options.systems
+    ),
+    options.existing
+  ));
+  if (blobs.length === 0) {
+    return { chords: [], visionUsed: false };
+  }
+
+  options.onProgress?.({
+    status: `Re-reading ${blobs.length} leftover chord-band glyph${blobs.length === 1 ? '' : 's'}...`,
+    progress: 0.96,
+  });
+
+  const scale = Math.max(0.01, options.raster.scale || 1);
+  const sourceWidth = options.raster.sourceWidth || options.raster.width / scale;
+  const sourceHeight = options.raster.sourceHeight || options.raster.height / scale;
+  const invert = Boolean(options.invert);
+  const chords: ChordPosition[] = [];
+  let visionUsed = false;
+  let visionModel: string | undefined;
+  let visionError: string | undefined;
+  let visionBudget = MAX_VISION_MICRO_CROPS;
+
+  const worker = await createWorker('eng', 1);
+  try {
+    for (let i = 0; i < blobs.length; i++) {
+      const blob = blobs[i];
+      const pad = Math.max(2, blob.lineSpacing * 0.5);
+      const srcX = Math.max(0, (blob.x0 - pad) / scale);
+      const srcY = Math.max(0, (blob.y0 - pad) / scale);
+      const srcW = Math.min(sourceWidth - srcX, Math.max(8, (blob.x1 - blob.x0 + pad * 2) / scale));
+      const srcH = Math.min(sourceHeight - srcY, Math.max(8, (blob.y1 - blob.y0 + pad * 2) / scale));
+      if (srcW < 6 || srcH < 6) continue;
+
+      const crop = await cropBandForOcr(
+        options.imageSource,
+        srcX,
+        srcY,
+        srcW,
+        srcH,
+        3.6,
+        invert
+      );
+      let name = interpretMicroOcrText(await recognizeMicroCrop(worker, crop.target));
+
+      if (!name && visionBudget > 0 && options.visionOptions) {
+        const { canAttemptVision, detectSingleGlyphChord } = await import('./visionAiService');
+        if (canAttemptVision(options.visionOptions)) {
+          const dataUrl = bandImageToDataUrl(crop);
+          if (dataUrl) {
+            visionBudget -= 1;
+            try {
+              const vision = await detectSingleGlyphChord(dataUrl, {
+                apiKey: options.visionOptions.apiKey,
+                provider: options.visionOptions.provider || 'openrouter',
+                apiEndpoint: options.visionOptions.apiEndpoint,
+              });
+              if (vision.model) {
+                visionUsed = true;
+                visionModel = vision.model;
+              }
+              if (vision.error) visionError = vision.error;
+              const visionName = vision.chords
+                .map((hit) => interpretMicroOcrText(hit.originalText))
+                .find((item): item is string => Boolean(item));
+              if (visionName) name = visionName;
+            } catch (error) {
+              visionError = error instanceof Error ? error.message : String(error);
+            }
+          }
+        }
+      }
+
+      if (!name) continue;
+      chords.push({
+        id: `ink-${i + 1}-${Date.now()}`,
+        originalText: name,
+        currentText: name,
+        x: blob.x,
+        y: blob.y,
+        width: Math.max(3, blob.width),
+        height: Math.max(2, blob.height),
+        confidence: 0.72,
+      });
+    }
+  } finally {
+    try {
+      await worker.terminate();
+    } catch {
+      // ignore
+    }
+  }
+
+  return { chords, visionUsed, visionModel, visionError };
+}
+
 /**
  * General hybrid scan: layout OCR and free Vision AI in parallel, then merge.
  * Staff-band crops go to Vision; lyric charts and diagrams use a full-page pass.
@@ -721,13 +886,44 @@ export async function scanSheetWithFallback(
     chords: [...ocrChords, ...visionPlaced].map((chord) => chord.originalText),
   });
   const merged = mergeChordDetections(ocrChords, visionPlaced, keepYRangesPct, previewKey);
-  const refined = refineDetectedChords(merged, ocrResult.printedKeyLabels);
-  const visionUsed = Boolean(visionResult.model) || (visionResult.chords || []).length > 0;
-  if (visionUsed && visionResult.model) {
+  let refined = refineDetectedChords(merged, ocrResult.printedKeyLabels);
+  let visionUsed = Boolean(visionResult.model) || (visionResult.chords || []).length > 0;
+  let visionModel = visionResult.model;
+  let visionError = visionResult.error;
+
+  if (!dropHallucinations && inkSystems.length > 0) {
+    try {
+      const leftover = await readLeftoverInkChords({
+        imageSource,
+        raster,
+        systems: inkSystems,
+        existing: refined.chords,
+        invert: raster.meanLuma < 90,
+        visionOptions,
+        onProgress,
+      });
+      if (leftover.chords.length > 0) {
+        const withInk = mergeChordDetections(
+          refined.chords,
+          leftover.chords,
+          keepYRangesPct,
+          previewKey
+        );
+        refined = refineDetectedChords(withInk, ocrResult.printedKeyLabels);
+      }
+      visionUsed = visionUsed || leftover.visionUsed;
+      if (leftover.visionModel) visionModel = leftover.visionModel;
+      if (leftover.visionError) visionError = leftover.visionError;
+    } catch (leftoverErr) {
+      console.warn('Leftover-ink second pass failed:', leftoverErr);
+    }
+  }
+
+  if (visionUsed && visionModel) {
     onProgress?.({
       status: refined.key
-        ? `Merged OCR with free Vision (${visionResult.model}); key ${refined.key.name}`
-        : `Merged OCR with free Vision (${visionResult.model})`,
+        ? `Merged OCR with free Vision (${visionModel}); key ${refined.key.name}`
+        : `Merged OCR with free Vision (${visionModel})`,
       progress: 1,
     });
   } else {
@@ -736,8 +932,8 @@ export async function scanSheetWithFallback(
   return {
     chords: refined.chords,
     visionUsed,
-    visionModel: visionResult.model,
-    visionError: visionResult.error,
+    visionModel,
+    visionError,
     inferredKey: refined.key?.name,
   };
 }

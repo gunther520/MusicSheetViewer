@@ -50,10 +50,20 @@ xPercent is 0-100 of the FULL stacked image (including the number gutter).
 Return ONLY JSON:
 {"chords":[{"chord":"C/E","strip":1,"xPercent":32.0,"yPercent":12.0,"widthPercent":6,"heightPercent":3}]}`;
 
+const ONE_GLYPH_PROMPT = `You are reading ONE cropped printed chord symbol from a lead-sheet chord band.
+Transcribe the glyph if it is actually a chord (including slash chords like C/E, D/F#, Bb/C).
+If the crop is specks, lyrics, a barline, or empty, return {"chords":[]}.
+Do not invent a chord from a key or a I–IV–V progression.
+
+Return ONLY JSON:
+{"chords":[{"chord":"Bb","xPercent":50,"yPercent":50,"widthPercent":80,"heightPercent":70}]}`;
+
 const FULL_SHEET_USER =
   'Transcribe every printed chord glyph, left-to-right then down the page. Keep slash chords (C/E, D/F#, Bb/C). Repeat identical chords as separate objects. If none, {"chords":[]}.';
 const BAND_USER =
   'Each numbered strip is one staff chord band. For every glyph: chord + strip + xPercent. Keep slashes and repeats. Blank strips contribute nothing. If none, {"chords":[]}.';
+const ONE_GLYPH_USER =
+  'This crop is a single leftover ink blob. Return one printed chord name if visible, else {"chords":[]}.';
 
 type JsonBody = {
   image?: string;
@@ -127,9 +137,17 @@ async function completeFreeVision(
   const imageUrl = image.startsWith('http') || image.startsWith('data:')
     ? image
     : `data:image/jpeg;base64,${image}`;
-  const system = layout === 'staff-bands' ? BAND_PROMPT : FULL_SHEET_PROMPT;
+  const system = layout === 'staff-bands'
+    ? BAND_PROMPT
+    : layout === 'one-glyph'
+      ? ONE_GLYPH_PROMPT
+      : FULL_SHEET_PROMPT;
   const hint = keyHint ? ` ${keyHint}` : '';
-  const user = (layout === 'staff-bands' ? BAND_USER : FULL_SHEET_USER) + hint;
+  const user = (layout === 'staff-bands'
+    ? BAND_USER
+    : layout === 'one-glyph'
+      ? ONE_GLYPH_USER
+      : FULL_SHEET_USER) + hint;
 
   let lastError = 'OpenRouter free-model request failed';
   let emptyModel: string | undefined;
@@ -227,10 +245,15 @@ export default async function handler(req: any, res?: any) {
       }, res);
     }
 
+    const layout = body.layout === 'staff-bands'
+      ? 'staff-bands'
+      : body.layout === 'one-glyph'
+        ? 'one-glyph'
+        : 'full-sheet';
     const { raw, model: usedModel } = await completeFreeVision(
       image,
       openRouterKey,
-      body.layout === 'staff-bands' ? 'staff-bands' : 'full-sheet',
+      layout,
       sanitizeKeyHint(body.keyHint)
     );
     const parsed = extractJsonObject(raw) || { chords: [] };

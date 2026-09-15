@@ -1,4 +1,4 @@
-export type VisionSheetLayout = 'staff-bands' | 'full-sheet';
+export type VisionSheetLayout = 'staff-bands' | 'full-sheet' | 'one-glyph';
 
 export const VISION_DETECTION_SYSTEM_PROMPT = `You are an expert engraver-level reader of printed lead sheets and chord charts.
 Your only job: transcribe chord SYMBOLS that are actually printed in THIS image. Do not invent, infer, or complete a progression.
@@ -64,11 +64,22 @@ Coordinates are for THIS stacked image:
 Return ONLY JSON:
 {"chords":[{"chord":"C/E","strip":1,"xPercent":32.0,"yPercent":12.0,"widthPercent":6,"heightPercent":3}]}`;
 
+export const VISION_ONE_GLYPH_SYSTEM_PROMPT = `You are reading ONE cropped printed chord symbol from a lead-sheet chord band.
+Transcribe the glyph if it is actually a chord (including slash chords like C/E, D/F#, Bb/C).
+If the crop is specks, lyrics, a barline, or empty, return {"chords":[]}.
+Do not invent a chord from a key or a I–IV–V progression.
+
+Return ONLY JSON:
+{"chords":[{"chord":"Bb","xPercent":50,"yPercent":50,"widthPercent":80,"heightPercent":70}]}`;
+
 export const VISION_FULL_SHEET_USER_TEXT =
   'Transcribe every printed chord glyph, left-to-right then down the page. Keep slash chords (C/E, D/F#, Bb/C). Repeat identical chords as separate objects. If none, {"chords":[]}.';
 
 export const VISION_BAND_MONTAGE_USER_TEXT =
   'Each numbered strip is one staff chord band. For every glyph: chord + strip + xPercent. Keep slashes and repeats. Blank strips contribute nothing. If none, {"chords":[]}.';
+
+export const VISION_ONE_GLYPH_USER_TEXT =
+  'This crop is a single leftover ink blob. Return one printed chord name if visible, else {"chords":[]}.';
 
 export function resolveVisionPrompts(
   layout: VisionSheetLayout = 'full-sheet',
@@ -82,6 +93,12 @@ export function resolveVisionPrompts(
     return {
       system: VISION_BAND_MONTAGE_SYSTEM_PROMPT,
       user: VISION_BAND_MONTAGE_USER_TEXT + hint,
+    };
+  }
+  if (layout === 'one-glyph') {
+    return {
+      system: VISION_ONE_GLYPH_SYSTEM_PROMPT,
+      user: VISION_ONE_GLYPH_USER_TEXT + hint,
     };
   }
   return {

@@ -5,6 +5,7 @@ import {
   clusterYTracks,
   detectStaffChordTracksFromGray,
   detectStaffSystemsFromGray,
+  findChordInkBlobs,
   snapToNearestTrack,
   systemsWithSymbolInk,
 } from './staffGeometry';
@@ -98,4 +99,39 @@ describe('Staff-aware Vision placement', () => {
     expect(hymnSystems.every((system) => system.isGrandStaff) || hymnSystems.length <= 4).toBe(true);
     expect(systemsWithSymbolInk(hymn.width, hymn.height, hymn.gray, hymnSystems)).toHaveLength(0);
   }, 30000);
+
+  it('finds leftover token-sized ink blobs in a synthetic chord band', () => {
+    const width = 160;
+    const height = 220;
+    const pixels = new Uint8Array(width * height);
+    pixels.fill(240);
+    const lineYs = [90, 98, 106, 114, 122];
+    lineYs.forEach((y) => {
+      for (let x = 12; x < 148; x++) {
+        pixels[y * width + x] = 10;
+      }
+    });
+    const systems = detectStaffSystemsFromGray(width, height, pixels);
+    expect(systems.length).toBeGreaterThanOrEqual(1);
+    const band = systems[0];
+    const boxes = [
+      { x0: 24, x1: 34 },
+      { x0: 70, x1: 80 },
+      { x0: 118, x1: 128 },
+    ];
+    boxes.forEach(({ x0, x1 }) => {
+      for (let y = band.chordBandBottom - 10; y < band.chordBandBottom - 3; y++) {
+        for (let x = x0; x < x1; x++) pixels[y * width + x] = 12;
+      }
+    });
+
+    const blobs = findChordInkBlobs(width, height, pixels, band);
+    expect(blobs.length).toBeGreaterThanOrEqual(3);
+    blobs.forEach((blob) => {
+      expect(blob.x).toBeGreaterThan(5);
+      expect(blob.x).toBeLessThan(95);
+      expect(blob.y).toBeGreaterThan(0);
+      expect(blob.width).toBeGreaterThan(0);
+    });
+  });
 });

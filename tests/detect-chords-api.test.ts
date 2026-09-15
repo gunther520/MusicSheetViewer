@@ -44,5 +44,6 @@ describe('detect-chords API handler', () => {
     const source = fs.readFileSync(path.resolve(__dirname, '../api/detect-chords.ts'), 'utf8');
     expect(source).not.toMatch(/^\s*import\s/m);
     expect(source).not.toMatch(/from ['"]\.\.\/src\//);
+    expect(source).toContain('one-glyph');
   });
 });
