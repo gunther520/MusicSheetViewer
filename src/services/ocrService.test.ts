@@ -5,6 +5,8 @@ import {
   CandidateToken,
   snapToNearestStaffChordTrack,
   interpretMicroOcrText,
+  compactMicroOcrText,
+  chordFromGlyphRead,
   CHORD_OCR_CHARSET,
 } from './ocrService';
 
@@ -85,9 +87,20 @@ describe('Music Sheet Staff-Aware Detection', () => {
     expect(interpretMicroOcrText('Bb')).toBe('Bb');
     expect(interpretMicroOcrText('C/E')).toBe('C/E');
     expect(interpretMicroOcrText('CIE')).toBe('C/E');
+    expect(interpretMicroOcrText('B b')).toBe('Bb');
+    expect(interpretMicroOcrText('C / E')).toBe('C/E');
+    expect(interpretMicroOcrText('C maj7')).toBe('Cmaj7');
+    expect(interpretMicroOcrText('C 7')).toBe('C7');
+    expect(interpretMicroOcrText('C E')).toBe('C/E');
     expect(interpretMicroOcrText('the')).toBeNull();
     expect(interpretMicroOcrText('and')).toBeNull();
     expect(interpretMicroOcrText('')).toBeNull();
+    expect(compactMicroOcrText('B b')).toBe('Bb');
+    expect(compactMicroOcrText('C E')).toBe('C E');
+    expect(chordFromGlyphRead({ text: 'Bb', confidence: 0.9, source: 'scripted' })).toBe('Bb');
+    expect(chordFromGlyphRead({ text: 'the', confidence: 0.99, source: 'scripted' })).toBeNull();
+    expect(chordFromGlyphRead({ text: 'Bb', confidence: 0.1, source: 'scripted' })).toBeNull();
+    expect(chordFromGlyphRead(null)).toBeNull();
     expect(CHORD_OCR_CHARSET).toContain('A');
     expect(CHORD_OCR_CHARSET).toContain('/');
     expect(CHORD_OCR_CHARSET).not.toMatch(/[WXYZ]/);

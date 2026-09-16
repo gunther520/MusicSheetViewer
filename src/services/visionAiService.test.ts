@@ -16,6 +16,11 @@ describe('Vision AI Service', () => {
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('{"chords":[]}');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('key signature');
     expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('Never invent I–IV–V');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('ONE OBJECT PER INK CLUSTER');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('time signature');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('guitar-diagram');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('Rehearsal marks');
+    expect(VISION_DETECTION_SYSTEM_PROMPT).toContain('Nashville');
   });
 
   it('uses a stacked staff-band prompt for layout-aware Vision', () => {
@@ -23,12 +28,18 @@ describe('Vision AI Service', () => {
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('{"chords":[]}');
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('"strip"');
     expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('C/E');
+    expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('One ink cluster');
+    expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('time signatures');
+    expect(VISION_BAND_MONTAGE_SYSTEM_PROMPT).toContain('Nashville');
     expect(resolveVisionPrompts('staff-bands').system).toBe(VISION_BAND_MONTAGE_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet').system).toBe(VISION_DETECTION_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('full-sheet', 'This page appears to be in F major.').user).toContain('F major');
     expect(resolveVisionPrompts('one-glyph').system).toBe(VISION_ONE_GLYPH_SYSTEM_PROMPT);
     expect(resolveVisionPrompts('one-glyph').user).toContain('leftover ink');
     expect(VISION_ONE_GLYPH_SYSTEM_PROMPT).toMatch(/do not invent/i);
+    expect(VISION_ONE_GLYPH_SYSTEM_PROMPT).toContain('Bb, not B7');
+    expect(VISION_ONE_GLYPH_SYSTEM_PROMPT).toContain('time signature');
+    expect(VISION_ONE_GLYPH_SYSTEM_PROMPT).toContain('B b');
   });
 
   it('correctly parses raw structured JSON from Vision AI output', () => {

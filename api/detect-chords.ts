@@ -26,12 +26,16 @@ Transcribe chord SYMBOLS actually printed in THIS image. Do not invent or comple
 HOW TO READ: Root A-G, optional #/b, optional quality, optional /bass.
 Slash: LEFT = chord, RIGHT = bass. C/E, D/F#, Bb/C, G/F, G/B, Gm7/C. Never drop or swap the slash.
 Jazz: △/∆/Δ = maj7 (write Cmaj7). ø = m7b5. Superscript 11 is 11 not 7. Eb is not Bb. Ab is not Db.
-If flat vs 7 is unclear, prefer this page's key signature / prevailing accidentals. Do not invent missing chords from the key.
+A small b after B is Bb, not B7. If flat vs 7 is unclear, prefer this page's key signature / prevailing accidentals.
+One ink cluster = one object. Do not merge neighbors or split Cmaj7. Repeats are separate objects.
+Guitar diagrams: the chord is the letter ABOVE the grid, not fret digits.
+Rehearsal boxes on the staff are not chords. Roman numerals / Nashville 1-4-5 are analysis, not A-G glyphs.
+Do not invent missing chords from the key.
 Include EVERY occurrence. Repeated C C C is three objects. Simple C F G Am still count.
 
-EXCLUDE lyrics, titles like "C Major", verse/chorus/intro, bar numbers, SATB, noteheads, N.C., lone | or /.
+EXCLUDE lyrics, titles like "C Major", verse/chorus/intro, bar numbers, SATB, noteheads, fingerings, N.C., time signatures, capo, percent-repeats, clefs, key-signature accidentals on the staff, lone | or /.
 
-xPercent/yPercent = glyph CENTER on THIS image (chords sit just above the staff). Walk left-to-right, then next staff down.
+xPercent/yPercent = glyph CENTER on THIS image (chords sit just above the staff, not on noteheads). Walk left-to-right, then next staff down.
 Zero printed symbols → {"chords":[]}.
 
 Return ONLY JSON:
@@ -42,7 +46,8 @@ THIS image is a VERTICAL STACK of chord-symbol bands above each staff. Gray left
 
 Read each strip left-to-right. One object per glyph. strip = left-column number (required).
 Slash: LEFT chord, RIGHT bass (C/E, D/F#, Bb/C). △ = maj7. 11 is not 7. Repeats are separate objects. Include C F G.
-Ambiguous accidentals follow this page's key signature. Do not invent chords from the key.
+One ink cluster = one object. Do not merge neighbors or split Cmaj7.
+Ambiguous accidentals follow this page's key signature. Ignore time signatures, capo, N.C., fret numbers, noteheads, rehearsal boxes, Roman/Nashville analysis, clefs.
 Blank strip → nothing. No symbols at all → {"chords":[]}. Do not invent.
 
 xPercent is 0-100 of the FULL stacked image (including the number gutter).
@@ -52,7 +57,9 @@ Return ONLY JSON:
 
 const ONE_GLYPH_PROMPT = `You are reading ONE cropped printed chord symbol from a lead-sheet chord band.
 Transcribe the glyph if it is actually a chord (including slash chords like C/E, D/F#, Bb/C).
-If the crop is specks, lyrics, a barline, or empty, return {"chords":[]}.
+Read the root letter first, then #/b, then quality, then /bass. A small b after B is Bb, not B7.
+Squeeze obvious spacing: "B b" is Bb, "C / E" is C/E, "C maj7" is Cmaj7.
+If the crop is specks, lyrics, a barline, a time signature, capo, rehearsal box, fret digits, or empty, return {"chords":[]}.
 Do not invent a chord from a key or a I–IV–V progression.
 
 Return ONLY JSON:

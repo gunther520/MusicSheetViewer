@@ -13,7 +13,7 @@ import {
   StaffSystem,
   systemsWithSymbolInk,
 } from './staffGeometry';
-import { cropBandForOcr, invertSheetForOcr, rasterizeSheet, bandImageToDataUrl, type GrayRaster } from './rasterize';
+import { cropBandForOcr, invertSheetForOcr, rasterizeSheet, bandImageToDataUrl, type BandImage, type GrayRaster } from './rasterize';
 import { mergeChordDetections, placeVisionOnStaffBands } from './mergeChordDetections';
 import {
   extractPrintedKeyLabels,
@@ -21,6 +21,13 @@ import {
   resolveSongKey,
 } from './musicTheory';
 import { capLeftoverBlobs, uncoveredInkBlobs } from './leftoverInk';
+import {
+  bandImageToGlyph,
+  createGlyphRecognizer,
+  CNN_GLYPH_MIN_CONFIDENCE,
+  type GlyphRead,
+  type GlyphRecognizer,
+} from './glyphCnn';
 
 export type { ChordPosition };
 export { isValidChord };
@@ -177,11 +184,26 @@ export function normalizeChordToken(raw: string): string[] {
 export const CHORD_OCR_CHARSET = 'ABCDEFGIabcdefg#b/m7susadjinuo+1234569-|';
 
 /**
+ * Squeeze CNN/OCR spacing without merging two neighboring roots (C E stays two tokens).
+ * "B b" → Bb, "C / E" → C/E, "C maj7" → Cmaj7, "C 7" → C7.
+ */
+export function compactMicroOcrText(raw: string): string {
+  return raw
+    .replace(/\s*\/\s*/g, '/')
+    .replace(/([A-Ga-g])\s+([b#])/g, '$1$2')
+    .replace(
+      /([A-G][#b]?)\s+(maj7|maj9|maj|min7|min|sus4|sus2|sus|dim7|dim|aug|add9|add|m7|m9|m)/gi,
+      '$1$2'
+    )
+    .replace(/([A-Za-z#b])\s+(\d)/g, '$1$2');
+}
+
+/**
  * Turn a micro-crop OCR string into one chord name, or null for lyrics/specks.
  */
 export function interpretMicroOcrText(raw: string): string | null {
   if (!raw || !raw.trim()) return null;
-  const names = normalizeChordToken(raw);
+  const names = normalizeChordToken(compactMicroOcrText(raw));
   const valid = names.filter((name) => isLikelyChordSymbol(name));
   if (valid.length === 0) return null;
   if (valid.length === 1) return valid[0];
@@ -190,6 +212,15 @@ export function interpretMicroOcrText(raw: string): string | null {
     if (isLikelyChordSymbol(slash)) return slash;
   }
   return valid.reduce((best, name) => (name.length > best.length ? name : best));
+}
+
+/** Accept a CNN CTC read only when it is both confident and a real chord. */
+export function chordFromGlyphRead(
+  read: GlyphRead | null,
+  minConfidence = CNN_GLYPH_MIN_CONFIDENCE
+): string | null {
+  if (!read || read.confidence < minConfidence) return null;
+  return interpretMicroOcrText(read.text);
 }
 
 export function cleanOcrToken(token: string): string[] {
@@ -697,8 +728,22 @@ async function recognizeMicroCrop(
   }
 }
 
+async function recognizeCropWithCnn(
+  crop: BandImage,
+  recognizer: GlyphRecognizer
+): Promise<string | null> {
+  try {
+    const glyph = await bandImageToGlyph(crop);
+    if (!glyph) return null;
+    return chordFromGlyphRead(await recognizer.recognize(glyph));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Re-read leftover chord-band ink that OCR+Vision missed.
+ * Order: pretrained CNN → charset Tesseract → optional one-glyph Vision.
  * Never invents a name from the key if the crop is empty.
  */
 export async function readLeftoverInkChords(options: {
@@ -713,6 +758,8 @@ export async function readLeftoverInkChords(options: {
     apiEndpoint?: string;
   };
   allowVision?: boolean;
+  /** Pass false to skip the CNN; omit to use the public PP-OCR weights. */
+  cnnRecognizer?: GlyphRecognizer | false;
   onProgress?: (progress: ScanProgress) => void;
 }): Promise<{ chords: ChordPosition[]; visionUsed: boolean; visionModel?: string; visionError?: string }> {
   const blobs = capLeftoverBlobs(uncoveredInkBlobs(
@@ -729,7 +776,7 @@ export async function readLeftoverInkChords(options: {
   }
 
   options.onProgress?.({
-    status: `Re-reading ${blobs.length} leftover chord-band glyph${blobs.length === 1 ? '' : 's'}...`,
+    status: `Re-reading ${blobs.length} leftover chord-band glyph${blobs.length === 1 ? '' : 's'} with a pretrained CNN...`,
     progress: 0.96,
   });
 
@@ -749,7 +796,17 @@ export async function readLeftoverInkChords(options: {
     visionBudget = 0;
   }
 
-  const worker = await createWorker('eng', 1);
+  const cnn = options.cnnRecognizer === false
+    ? null
+    : (options.cnnRecognizer || createGlyphRecognizer());
+  const tess = {
+    worker: null as Awaited<ReturnType<typeof createWorker>> | null,
+  };
+  const tessWorker = async () => {
+    if (!tess.worker) tess.worker = await createWorker('eng', 1);
+    return tess.worker;
+  };
+
   try {
     for (let i = 0; i < blobs.length; i++) {
       const blob = blobs[i];
@@ -769,7 +826,11 @@ export async function readLeftoverInkChords(options: {
         3.6,
         invert
       );
-      let name = await recognizeMicroCrop(worker, crop.target);
+      let name = cnn ? await recognizeCropWithCnn(crop, cnn) : null;
+      let confidence = name ? 0.8 : 0.72;
+      if (!name) {
+        name = await recognizeMicroCrop(await tessWorker(), crop.target);
+      }
 
       if (!name && visionBudget > 0 && visionMod) {
         const dataUrl = bandImageToDataUrl(crop);
@@ -789,6 +850,7 @@ export async function readLeftoverInkChords(options: {
             name = vision.chords
               .map((hit) => interpretMicroOcrText(hit.originalText))
               .find((item): item is string => Boolean(item)) || null;
+            if (name) confidence = 0.7;
           } catch (error) {
             visionError = error instanceof Error ? error.message : String(error);
           }
@@ -804,14 +866,16 @@ export async function readLeftoverInkChords(options: {
         y: blob.y,
         width: Math.max(3, blob.width),
         height: Math.max(2, blob.height),
-        confidence: 0.72,
+        confidence,
       });
     }
   } finally {
-    try {
-      await worker.terminate();
-    } catch {
-      // ignore
+    if (tess.worker) {
+      try {
+        await tess.worker.terminate();
+      } catch {
+        // ignore
+      }
     }
   }
 

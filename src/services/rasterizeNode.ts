@@ -59,6 +59,15 @@ export async function cropBandWithSharp(
   return pipeline.sharpen().png().toBuffer();
 }
 
+export async function decodePngToGray(png: Uint8Array): Promise<{ width: number; height: number; gray: Uint8Array }> {
+  const { data, info } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true });
+  return {
+    width: info.width,
+    height: info.height,
+    gray: data,
+  };
+}
+
 export async function buildMontageWithSharp(
   filePath: string,
   slices: Array<{ srcY: number; srcH: number }>,
@@ -81,7 +90,7 @@ export async function buildMontageWithSharp(
   const gutter = Math.max(0, Math.round(gutterWidth));
   const outW = musicW + gutter;
   const mapped: Array<{ montageY0: number; montageY1: number; srcY: number; srcH: number }> = [];
-  const composites: Array<{ input: Uint8Array; top: number; left: number }> = [];
+  const composites: Array<{ input: Buffer; top: number; left: number }> = [];
   let y = 0;
 
   for (let i = 0; i < slices.length; i++) {
@@ -104,7 +113,7 @@ export async function buildMontageWithSharp(
         </svg>`
       );
       const label = await sharp(labelSvg).png().toBuffer();
-      composites.push({ input: label, top: y, left: 0 });
+      composites.push({ input: Buffer.from(label), top: y, left: 0 });
     }
     mapped.push({
       montageY0: y,

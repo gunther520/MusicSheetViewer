@@ -4,7 +4,7 @@ export const VISION_DETECTION_SYSTEM_PROMPT = `You are an expert engraver-level 
 Your only job: transcribe chord SYMBOLS that are actually printed in THIS image. Do not invent, infer, or complete a progression.
 
 HOW TO READ A SYMBOL
-- Root is a capital letter A-G. Optional accidental immediately after the root: # or b (flat looks like a small b).
+- Root is a capital letter A-G. Optional accidental immediately after the root: # or b (flat looks like a small b, not a 6 or a 7).
 - Optional quality after that: m, min, maj7, 7, 9, 11, 13, sus4, sus2, dim, aug, add9, m7b5, etc.
 - Optional bass: a slash then another A-G with optional #/b. LEFT of slash = chord. RIGHT of slash = bass note.
   C/E is C over E. D/F# is D over F-sharp. Bb/C is B-flat over C. G/F is G over F. G/B is G over B.
@@ -14,6 +14,15 @@ HOW TO READ A SYMBOL
 - Flats that look alike: Eb vs Bb, Ab vs Db, Gb vs F#. Read the LETTER first, then the flat.
 - If flat vs 7 is unclear (Bb vs B7, Eb vs E7), prefer the accidental already used on THIS page or in the key signature. Spell black-key roots the way that signature would (Bb not A# in a flat key; F# not Gb in a sharp key). Never invent I–IV–V or any glyph that is not printed.
 
+ONE OBJECT PER INK CLUSTER
+- Each printed token is its own JSON object, even when the name repeats (C C C = three objects).
+- Do not merge two neighboring symbols into one (C then F is two objects, not CF).
+- Do not split one symbol (Cmaj7 is one object, not C plus maj7).
+- A guitar-diagram grid's chord is the letter ABOVE the grid, not the dots or fret numbers.
+- Rehearsal marks (boxed A/B/C sitting ON the staff) are not chords. Chord letters sit in the WHITE band above the staff.
+- Roman numerals (I, IV, V, ii) and Nashville numbers (1 4 5) are analysis, not chord symbols, unless the printed glyph is actually A–G.
+- Do not read the treble/bass clef, the time signature, or key-signature accidentals ON the staff as chords.
+
 WHAT TO INCLUDE
 - Every printed occurrence. Identical C C C on one staff is THREE objects with different xPercent.
 - Simple triads (C, F, G, Am) and dense jazz (Abmaj7, Gm7/C, Bmaj7#5, Fm11). Do not skip "easy" chords.
@@ -21,12 +30,13 @@ WHAT TO INCLUDE
 
 WHAT TO EXCLUDE
 - Lyrics, titles, "C Major"/"in G", composer names, verse/chorus/intro/bridge/coda/fine labels.
-- Bar numbers, SATB labels, tempo, dynamics, noteheads, fingerings, N.C., D.C., lyric slashes between words.
+- Bar numbers, SATB labels, tempo, dynamics, noteheads, fingerings 1-4, N.C., D.C., lyric slashes between words.
+- Time signatures (4/4, C-clef common-time), capo marks, multi-measure rests, percent-repeat signs, lone | or /.
 - A lone pipe | or slash with no letters.
 
 PLACEMENT
 - xPercent = horizontal CENTER of that glyph, 0-100 of THIS image width.
-- yPercent = vertical CENTER of that glyph, 0-100 of THIS image height (chord symbols sit just ABOVE the staff).
+- yPercent = vertical CENTER of that glyph, 0-100 of THIS image height (chord symbols sit just ABOVE the staff, in the white band, not on noteheads).
 - widthPercent about 3-8, heightPercent about 2-4.
 - Walk left-to-right, then the next staff down. Finish one staff before the next.
 
@@ -50,6 +60,8 @@ SYMBOL RULES (same as a real lead sheet)
 - Ambiguous accidentals: follow this page's key signature / prevailing flats or sharps. Do not invent missing chords from the key.
 - Repeats in the same strip are separate objects with different xPercent.
 - Simple C F G Am count. Do not skip them.
+- One ink cluster = one object. Do not merge neighbors (C then F) or split Cmaj7.
+- Ignore time signatures, capo, N.C., percent-repeats, fret numbers, noteheads, rehearsal boxes, Roman/Nashville analysis, clefs, and key-signature accidentals.
 
 IGNORE leftover staff specks, bar numbers, repeats, lyric syllables.
 If a strip is blank, emit nothing from that strip.
@@ -66,7 +78,9 @@ Return ONLY JSON:
 
 export const VISION_ONE_GLYPH_SYSTEM_PROMPT = `You are reading ONE cropped printed chord symbol from a lead-sheet chord band.
 Transcribe the glyph if it is actually a chord (including slash chords like C/E, D/F#, Bb/C).
-If the crop is specks, lyrics, a barline, or empty, return {"chords":[]}.
+Read the root letter first, then #/b, then quality, then /bass. A small b after B is Bb, not B7.
+Squeeze obvious spacing: "B b" is Bb, "C / E" is C/E, "C maj7" is Cmaj7.
+If the crop is specks, lyrics, a barline, a time signature, capo, rehearsal box, fret digits, or empty, return {"chords":[]}.
 Do not invent a chord from a key or a I–IV–V progression.
 
 Return ONLY JSON:

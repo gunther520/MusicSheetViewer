@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), detectChordsDevPlugin(env.OPENROUTER_API_KEY || '')],
     optimizeDeps: {
-      exclude: ['sharp'],
+      exclude: ['sharp', 'onnxruntime-web'],
     },
     build: {
       rollupOptions: {

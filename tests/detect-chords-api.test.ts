@@ -45,5 +45,9 @@ describe('detect-chords API handler', () => {
     expect(source).not.toMatch(/^\s*import\s/m);
     expect(source).not.toMatch(/from ['"]\.\.\/src\//);
     expect(source).toContain('one-glyph');
+    expect(source).toContain('ink cluster');
+    expect(source).toContain('time signature');
+    expect(source).toContain('rehearsal');
+    expect(source).toContain('Nashville');
   });
 });
