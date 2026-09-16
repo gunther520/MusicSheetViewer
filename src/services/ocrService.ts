@@ -676,25 +676,25 @@ const MAX_VISION_MICRO_CROPS = 4;
 async function recognizeMicroCrop(
   worker: Awaited<ReturnType<typeof createWorker>>,
   target: unknown
-): Promise<string> {
-  const texts: string[] = [];
+): Promise<string | null> {
   try {
     await worker.setParameters({
       tessedit_pageseg_mode: '8' as any,
       tessedit_char_whitelist: CHORD_OCR_CHARSET,
     });
     const word = await worker.recognize(target as any);
-    if (word.data?.text) texts.push(word.data.text);
+    const fromWord = interpretMicroOcrText(word.data?.text || '');
+    if (fromWord) return fromWord;
+
     await worker.setParameters({
       tessedit_pageseg_mode: '7' as any,
       tessedit_char_whitelist: CHORD_OCR_CHARSET,
     });
     const line = await worker.recognize(target as any);
-    if (line.data?.text) texts.push(line.data.text);
+    return interpretMicroOcrText(line.data?.text || '');
   } catch {
-    // ignore crop OCR failures
+    return null;
   }
-  return texts.join(' ');
 }
 
 /**
@@ -712,6 +712,7 @@ export async function readLeftoverInkChords(options: {
     provider?: 'openrouter' | 'openai' | 'gemini' | 'anthropic';
     apiEndpoint?: string;
   };
+  allowVision?: boolean;
   onProgress?: (progress: ScanProgress) => void;
 }): Promise<{ chords: ChordPosition[]; visionUsed: boolean; visionModel?: string; visionError?: string }> {
   const blobs = capLeftoverBlobs(uncoveredInkBlobs(
@@ -740,7 +741,13 @@ export async function readLeftoverInkChords(options: {
   let visionUsed = false;
   let visionModel: string | undefined;
   let visionError: string | undefined;
-  let visionBudget = MAX_VISION_MICRO_CROPS;
+  let visionBudget = options.allowVision ? MAX_VISION_MICRO_CROPS : 0;
+  const visionMod = visionBudget > 0
+    ? await import('./visionAiService')
+    : null;
+  if (visionMod && !visionMod.canAttemptVision(options.visionOptions)) {
+    visionBudget = 0;
+  }
 
   const worker = await createWorker('eng', 1);
   try {
@@ -762,32 +769,28 @@ export async function readLeftoverInkChords(options: {
         3.6,
         invert
       );
-      let name = interpretMicroOcrText(await recognizeMicroCrop(worker, crop.target));
+      let name = await recognizeMicroCrop(worker, crop.target);
 
-      if (!name && visionBudget > 0 && options.visionOptions) {
-        const { canAttemptVision, detectSingleGlyphChord } = await import('./visionAiService');
-        if (canAttemptVision(options.visionOptions)) {
-          const dataUrl = bandImageToDataUrl(crop);
-          if (dataUrl) {
-            visionBudget -= 1;
-            try {
-              const vision = await detectSingleGlyphChord(dataUrl, {
-                apiKey: options.visionOptions.apiKey,
-                provider: options.visionOptions.provider || 'openrouter',
-                apiEndpoint: options.visionOptions.apiEndpoint,
-              });
-              if (vision.model) {
-                visionUsed = true;
-                visionModel = vision.model;
-              }
-              if (vision.error) visionError = vision.error;
-              const visionName = vision.chords
-                .map((hit) => interpretMicroOcrText(hit.originalText))
-                .find((item): item is string => Boolean(item));
-              if (visionName) name = visionName;
-            } catch (error) {
-              visionError = error instanceof Error ? error.message : String(error);
+      if (!name && visionBudget > 0 && visionMod) {
+        const dataUrl = bandImageToDataUrl(crop);
+        if (dataUrl) {
+          visionBudget -= 1;
+          try {
+            const vision = await visionMod.detectSingleGlyphChord(dataUrl, {
+              apiKey: options.visionOptions?.apiKey,
+              provider: options.visionOptions?.provider || 'openrouter',
+              apiEndpoint: options.visionOptions?.apiEndpoint,
+            });
+            if (vision.model) {
+              visionUsed = true;
+              visionModel = vision.model;
             }
+            if (vision.error) visionError = vision.error;
+            name = vision.chords
+              .map((hit) => interpretMicroOcrText(hit.originalText))
+              .find((item): item is string => Boolean(item)) || null;
+          } catch (error) {
+            visionError = error instanceof Error ? error.message : String(error);
           }
         }
       }
@@ -891,7 +894,7 @@ export async function scanSheetWithFallback(
   let visionModel = visionResult.model;
   let visionError = visionResult.error;
 
-  if (!dropHallucinations && inkSystems.length > 0) {
+  if (inkSystems.length > 0) {
     try {
       const leftover = await readLeftoverInkChords({
         imageSource,
@@ -900,6 +903,7 @@ export async function scanSheetWithFallback(
         existing: refined.chords,
         invert: raster.meanLuma < 90,
         visionOptions,
+        allowVision: Boolean(visionResult.model),
         onProgress,
       });
       if (leftover.chords.length > 0) {

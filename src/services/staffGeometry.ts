@@ -304,7 +304,6 @@ function looksLikePrintedSymbol(widthPx: number, heightPx: number, spacing: numb
   if (spacing <= 0) return false;
   if (widthPx < spacing * 0.28 || heightPx < spacing * 0.38) return false;
   if (widthPx > spacing * 4.6 || heightPx > spacing * 2.3) return false;
-  if (heightPx < spacing * 0.35 && widthPx > spacing * 3) return false;
   return true;
 }
 
@@ -372,19 +371,26 @@ export function findChordInkBlobs(
       if (mx > maxX) maxX = mx;
       if (my > maxY) maxY = my;
       count += 1;
-      const candidates = [
-        [mx - 1, my],
-        [mx + 1, my],
-        [mx, my - 1],
-        [mx, my + 1],
-      ];
-      candidates.forEach(([nx, ny]) => {
-        if (nx < 0 || ny < 0 || nx >= maskW || ny >= maskH) return;
-        const next = ny * maskW + nx;
-        if (!dark[next] || visited[next]) return;
-        visited[next] = 1;
-        stack.push(next);
-      });
+      const left = idx - 1;
+      const right = idx + 1;
+      const up = idx - maskW;
+      const down = idx + maskW;
+      if (mx > 0 && dark[left] && !visited[left]) {
+        visited[left] = 1;
+        stack.push(left);
+      }
+      if (mx + 1 < maskW && dark[right] && !visited[right]) {
+        visited[right] = 1;
+        stack.push(right);
+      }
+      if (my > 0 && dark[up] && !visited[up]) {
+        visited[up] = 1;
+        stack.push(up);
+      }
+      if (my + 1 < maskH && dark[down] && !visited[down]) {
+        visited[down] = 1;
+        stack.push(down);
+      }
     }
 
     if (count < Math.max(8, spacing * 0.35)) continue;
