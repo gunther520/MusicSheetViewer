@@ -7,7 +7,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), detectChordsDevPlugin(env.OPENROUTER_API_KEY || '')],
     optimizeDeps: {
-      exclude: ['sharp', 'onnxruntime-web'],
+      exclude: ['sharp', 'onnxruntime-web', 'onnxruntime-web/wasm'],
+    },
+    resolve: {
+      // Official ORT export condition: load JS only; wasm comes from wasmPaths (CDN).
+      conditions: ['onnxruntime-web-use-extern-wasm'],
     },
     build: {
       rollupOptions: {

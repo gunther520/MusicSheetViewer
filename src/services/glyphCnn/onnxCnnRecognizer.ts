@@ -11,7 +11,7 @@ export const PPOCR_EN_REC_MODEL_URLS = [
 
 const ORT_WASM_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/';
 
-type OrtModule = typeof import('onnxruntime-web');
+type OrtModule = typeof import('onnxruntime-web/wasm');
 type InferenceSession = import('onnxruntime-web').InferenceSession;
 
 let shared: OnnxCnnGlyphRecognizer | null = null;
@@ -121,7 +121,7 @@ function transposeNcToNt(data: Float32Array, timeSteps: number, classCount: numb
 
 async function loadOrt(): Promise<OrtModule | null> {
   try {
-    const ort = await import('onnxruntime-web');
+    const ort = await import('onnxruntime-web/wasm');
     if (ort.env?.wasm) {
       ort.env.wasm.wasmPaths = ORT_WASM_CDN;
       ort.env.wasm.numThreads = 1;
